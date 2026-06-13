@@ -41,7 +41,7 @@ export function Modal({ open, onClose, title, children }: Props) {
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative z-10 w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">
             {title}

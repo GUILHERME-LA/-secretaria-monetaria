@@ -120,7 +120,7 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
 
       {/* Bolha de chat */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl">
+        <div className="fixed bottom-24 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
             <Sparkles size={16} style={{ color: "var(--accent)" }} />
             <span className="text-sm font-semibold text-[var(--foreground)]">
