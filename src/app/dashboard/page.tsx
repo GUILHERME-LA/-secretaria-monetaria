@@ -21,6 +21,7 @@ import { ExpenseRanking } from "@/components/ExpenseRanking";
 import { MonthlyBarChart } from "@/components/MonthlyBarChart";
 import { TransactionList } from "@/components/TransactionList";
 import { ChatFab } from "@/components/ChatFab";
+import { WelcomeTutorial } from "@/components/WelcomeTutorial";
 import { seedDefaultCategories } from "@/lib/seed-categories";
 
 export default function DashboardPage() {
@@ -224,6 +225,7 @@ export default function DashboardPage() {
       </main>
 
       <ChatFab onDone={handleRefresh} />
+      <WelcomeTutorial />
     </>
   );
 }

@@ -112,6 +112,7 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
     <>
       {/* FAB */}
       <button
+        id="tour-chat"
         onClick={() => setOpen((v) => !v)}
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
       >

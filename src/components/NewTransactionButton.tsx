@@ -21,7 +21,7 @@ export function NewTransactionButton({ onDone, currentMonth }: Props) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
+      <Button id="tour-nova-transacao" onClick={() => setOpen(true)}>
         <Plus size={18} />
         Nova Transação
       </Button>
