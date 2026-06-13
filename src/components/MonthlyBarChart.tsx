@@ -32,16 +32,15 @@ export function MonthlyBarChart({ data }: Props) {
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v: number) =>
-              v.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-                maximumFractionDigits: 0,
-              })
-            }
+            width={60}
+            tickFormatter={(v: number) => {
+              if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + "M";
+              if (Math.abs(v) >= 1000) return "R$ " + (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + "k";
+              return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+            }}
           />
           <Tooltip
             contentStyle={{
