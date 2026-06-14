@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Target, Plus, Trash2, ArrowRight, HelpCircle } from "lucide-react";
+import { Target, Plus, Trash2, ArrowRight } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -11,21 +11,6 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCurrency } from "@/lib/utils";
 import type { Meta } from "@/components/MetasDashboard";
-import { useRouter } from "next/navigation";
-
-const STORAGE_KEY = "sm_metas";
-
-function loadMetas(): Meta[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveMetas(metas: Meta[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(metas));
-}
 
 const CORES = [
   "#6366f1", "#22c55e", "#eab308", "#ef4444", "#f97316",
@@ -33,8 +18,8 @@ const CORES = [
 ];
 
 export default function MetasPage() {
-  const router = useRouter();
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [valorObjetivo, setValorObjetivo] = useState("");
@@ -42,46 +27,59 @@ export default function MetasPage() {
   const [cor, setCor] = useState(CORES[0]);
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    setMetas(loadMetas());
-  }, []);
+  async function load() {
+    setLoading(true);
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_metas", payload: {} }),
+    });
+    const { data } = await res.json();
+    if (data) setMetas(data.map((m: any) => ({ ...m, valor: Number(m.valor) })));
+    setLoading(false);
+  }
 
-  const refresh = useCallback(() => {
-    setMetas(loadMetas());
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  function criar() {
+  async function criar() {
     if (!titulo.trim() || !valorObjetivo) return;
-    const nova: Meta = {
-      id: crypto.randomUUID(),
-      titulo: titulo.trim(),
-      valorObjetivo: Number(valorObjetivo),
-      valorAtual: Number(valorAtual) || 0,
-      cor,
-      createdAt: new Date().toISOString(),
-    };
-    const items = [...metas, nova];
-    saveMetas(items);
-    setMetas(items);
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "criar_meta",
+        payload: {
+          titulo: titulo.trim(),
+          valor_objetivo: Number(valorObjetivo),
+          valor_atual: Number(valorAtual) || 0,
+          cor,
+        },
+      }),
+    });
     setTitulo("");
     setValorObjetivo("");
     setValorAtual("");
     setCor(CORES[0]);
     setModalOpen(false);
+    load();
   }
 
-  function excluir(id: string) {
-    const items = metas.filter((m) => m.id !== id);
-    saveMetas(items);
-    setMetas(items);
+  async function excluir(id: string) {
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "excluir_meta", payload: { id } }),
+    });
+    load();
   }
 
-  function atualizarValor(id: string, valor: number) {
-    const items = metas.map((m) =>
-      m.id === id ? { ...m, valorAtual: Math.min(valor, m.valorObjetivo) } : m
-    );
-    saveMetas(items);
-    setMetas(items);
+  async function atualizarValor(id: string, valor: number) {
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "atualizar_valor_meta", payload: { id, valor_atual: valor } }),
+    });
+    load();
   }
 
   const totalObjetivo = metas.reduce((s, m) => s + m.valorObjetivo, 0);
@@ -175,7 +173,11 @@ export default function MetasPage() {
           </motion.div>
         </div>
 
-        {metas.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+          </div>
+        ) : metas.length === 0 ? (
           <EmptyState
             icon={Target}
             title="Nenhuma meta criada"

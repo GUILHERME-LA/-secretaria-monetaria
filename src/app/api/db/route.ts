@@ -108,6 +108,23 @@ export async function POST(request: NextRequest) {
         result = await pool.query("SELECT listar_pendentes_mes_json($1, $2::date, $3::date) AS data", [user.id, payload.inicio, payload.fim]);
         return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
+      case "criar_meta":
+        result = await pool.query("SELECT criar_meta($1, $2, $3, $4, $5) AS id",
+          [user.id, payload.titulo, payload.valor_objetivo, payload.valor_atual || 0, payload.cor || "#6366f1"]);
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
+
+      case "listar_metas":
+        result = await pool.query("SELECT listar_metas_json($1) AS data", [user.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
+
+      case "atualizar_valor_meta":
+        await pool.query("SELECT atualizar_valor_meta($1, $2, $3)", [user.id, payload.id, payload.valor_atual]);
+        return NextResponse.json({ success: true, data: null });
+
+      case "excluir_meta":
+        await pool.query("SELECT excluir_meta($1, $2)", [user.id, payload.id]);
+        return NextResponse.json({ success: true, data: null });
+
       default:
         return NextResponse.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }

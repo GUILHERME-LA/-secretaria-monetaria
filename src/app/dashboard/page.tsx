@@ -33,16 +33,6 @@ import { Modal } from "@/components/ui/Modal";
 import { seedDefaultCategories } from "@/lib/seed-categories";
 import { Settings2 } from "lucide-react";
 
-const METAS_KEY = "sm_metas";
-
-function loadMetas(): Meta[] {
-  try {
-    return JSON.parse(localStorage.getItem(METAS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
 const widgetLabels: Record<WidgetKey, string> = {
   insights: "Insights Inteligentes",
   calendar: "Calendário Financeiro",
@@ -266,13 +256,19 @@ export default function DashboardPage() {
     }
   }, [month]);
 
-  useEffect(() => {
-    seedDefaultCategories();
+  const loadMetas = useCallback(async () => {
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_metas", payload: {} }),
+    });
+    const { data } = await res.json();
+    if (data) setMetas(data);
   }, []);
 
   useEffect(() => {
-    setMetas(loadMetas());
-  }, [refreshKey]);
+    seedDefaultCategories();
+  }, []);
 
   useEffect(() => {
     loadMonths();
@@ -287,7 +283,8 @@ export default function DashboardPage() {
     loadDashboard();
     loadComparativo();
     loadCalendar();
-  }, [loadDashboard, loadComparativo, loadCalendar, refreshKey]);
+    loadMetas();
+  }, [loadDashboard, loadComparativo, loadCalendar, loadMetas, refreshKey]);
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1);
