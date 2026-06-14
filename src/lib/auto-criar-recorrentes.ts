@@ -1,30 +1,23 @@
-"use server";
-
-import { createClient } from "@/lib/supabase-client";
-
 export async function autoCriarRecorrentes() {
-  const supabase = createClient();
-
   const now = new Date();
   const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const ultimoDia = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
-
-  const { data: recorrentes } = await supabase
-    .from("sm_recorrentes")
-    .select("id, categoria_id, descricao, valor, tipo, dia_vencimento")
-    .eq("ativo", true);
+  const resRec = await fetch("/api/db", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "listar_recorrentes_ativos", payload: {} }),
+  });
+  const { data: recorrentes } = await resRec.json();
 
   if (!recorrentes || recorrentes.length === 0) return 0;
 
-  const { data: existentes } = await supabase
-    .from("sm_transacoes")
-    .select("descricao, tipo, categoria_id")
-    .gte("data", `${mesAtual}-01`)
-    .lte("data", `${mesAtual}-${String(ultimoDia).padStart(2, "0")}`)
-    .eq("status", "pendente");
+  const resEx = await fetch("/api/db", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "listar_pendentes_mes", payload: { inicio: `${mesAtual}-01`, fim: `${mesAtual}-${String(ultimoDia).padStart(2, "0")}` } }),
+  });
+  const { data: existentes } = await resEx.json();
 
   let criadas = 0;
 
@@ -41,17 +34,16 @@ export async function autoCriarRecorrentes() {
     const dia = Math.min(rec.dia_vencimento, ultimoDia);
     const data = `${mesAtual}-${String(dia).padStart(2, "0")}`;
 
-    const { error } = await supabase.from("sm_transacoes").insert({
-      user_id: user.id,
-      categoria_id: rec.categoria_id,
-      descricao: rec.descricao,
-      valor: rec.valor,
-      tipo: rec.tipo,
-      data,
-      status: "pendente",
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "inserir_transacao",
+        payload: { categoria_id: rec.categoria_id, descricao: rec.descricao, valor: rec.valor, tipo: rec.tipo, data, status: "pendente" },
+      }),
     });
-
-    if (!error) criadas++;
+    const dbData = await res.json();
+    if (!dbData.error) criadas++;
   }
 
   return criadas;

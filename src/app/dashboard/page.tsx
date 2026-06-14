@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export const dynamic = "force-dynamic";
-import { createClient } from "@/lib/supabase-client";
 import {
   getCurrentMonth,
   getMonthBounds,
@@ -25,7 +24,6 @@ import { WelcomeTutorial } from "@/components/WelcomeTutorial";
 import { seedDefaultCategories } from "@/lib/seed-categories";
 
 export default function DashboardPage() {
-  const supabase = useMemo(() => createClient(), []);
   const hoje = getCurrentMonth();
   const [month, setMonth] = useState(hoje);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -50,10 +48,12 @@ export default function DashboardPage() {
   >([]);
 
   const loadMonths = useCallback(async () => {
-    const { data } = await supabase
-      .from("sm_transacoes")
-      .select("data")
-      .order("data", { ascending: true });
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_meses", payload: {} }),
+    });
+    const { data } = await res.json();
 
     const meses = new Set<string>();
     if (data) data.forEach((t: any) => meses.add(t.data.slice(0, 7)));
@@ -61,16 +61,17 @@ export default function DashboardPage() {
     getNextNMonths(hoje, 12).forEach((m) => meses.add(m));
     const sorted = Array.from(meses).sort();
     setAvailableMonths(sorted);
-  }, [supabase, hoje]);
+  }, [hoje]);
 
   const loadDashboard = useCallback(async () => {
     const { inicio, fim } = getMonthBounds(month);
 
-    const { data: transacoes } = await supabase
-      .from("sm_transacoes")
-      .select("*, categorias(nome, cor)")
-      .gte("data", inicio)
-      .lte("data", fim);
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_transacoes_mes", payload: { inicio, fim } }),
+    });
+    const { data: transacoes } = await res.json();
 
     if (!transacoes) return;
 
@@ -101,11 +102,11 @@ export default function DashboardPage() {
     const agg: Record<string, { nome: string; cor: string; valor: number }> =
       {};
     despGrafico.forEach((t: any) => {
-      const key = t.categorias?.nome || "Sem categoria";
+      const key = t.categoria_nome || "Sem categoria";
       if (!agg[key]) {
         agg[key] = {
           nome: key,
-          cor: t.categorias?.cor || "#6366f1",
+          cor: t.categoria_cor || "#6366f1",
           valor: 0,
         };
       }
@@ -115,7 +116,7 @@ export default function DashboardPage() {
     const sorted = Object.values(agg).sort((a, b) => b.valor - a.valor);
     setPieData(sorted);
     setRankingData(sorted.slice(0, 5));
-  }, [month, supabase, mostrarPrevistas]);
+  }, [month, mostrarPrevistas]);
 
   const loadComparativo = useCallback(async () => {
     const meses = getLast6Months(month);
@@ -125,11 +126,12 @@ export default function DashboardPage() {
     for (const m of meses) {
       const { inicio, fim } = getMonthBounds(m);
 
-      const { data } = await supabase
-        .from("sm_transacoes")
-        .select("tipo, valor, status")
-        .gte("data", inicio)
-        .lte("data", fim);
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listar_totais_mes", payload: { inicio, fim } }),
+      });
+      const { data } = await res.json();
 
       const realizadas = (data || []).filter((t: any) => t.status === "confirmada");
       const todas = data || [];
@@ -157,7 +159,7 @@ export default function DashboardPage() {
 
     setComparativo(realizados);
     setComparativoTotal(totais);
-  }, [month, supabase]);
+  }, [month]);
 
   useEffect(() => {
     seedDefaultCategories();

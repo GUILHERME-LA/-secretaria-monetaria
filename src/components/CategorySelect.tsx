@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
-import { createClient } from "@/lib/supabase-client";
+import { useEffect, useState, useRef } from "react";
 import type { Categoria } from "@/lib/types";
 import { Select } from "./ui/Select";
 import { Modal } from "./ui/Modal";
@@ -15,7 +14,6 @@ type Props = {
 };
 
 export function CategorySelect({ tipo, value, onChange }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [open, setOpen] = useState(false);
   const [novaCat, setNovaCat] = useState("");
@@ -29,26 +27,28 @@ export function CategorySelect({ tipo, value, onChange }: Props) {
   }, [tipo]);
 
   async function load() {
-    const { data } = await supabase
-      .from("sm_categorias")
-      .select("*")
-      .eq("tipo", tipo)
-      .order("nome");
-    if (data) setCategorias(data);
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_categorias", payload: { tipo } }),
+    });
+    const json = await res.json();
+    if (json.data) setCategorias(json.data);
   }
 
   async function criarCategoria() {
     if (!novaCat.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { error } = await supabase.from("sm_categorias").insert({
-      user_id: user.id,
-      nome: novaCat.trim(),
-      tipo,
-      cor: novaCor,
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "inserir_categoria",
+        payload: { nome: novaCat.trim(), tipo, cor: novaCor },
+      }),
     });
-    if (error) {
-      alert("Erro ao criar categoria: " + error.message);
+    const data = await res.json();
+    if (data.error) {
+      alert("Erro ao criar categoria: " + data.error);
       return;
     }
     setNovaCat("");

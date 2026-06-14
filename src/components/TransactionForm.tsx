@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { createClient } from "@/lib/supabase-client";
+import { useState } from "react";
 import type { TransacaoFormData } from "@/lib/types";
 import { Input } from "./ui/Input";
 import { Textarea } from "./ui/Textarea";
@@ -15,7 +14,6 @@ type Props = {
 };
 
 export function TransactionForm({ onDone, initial, currentMonth }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const [tipo, setTipo] = useState<"receita" | "despesa">(
     initial?.tipo || "despesa"
   );
@@ -42,59 +40,75 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
     const novoValor = parseFloat(valor.replace(",", "."));
 
     if (initial?.id) {
-      const { data: atual } = await supabase
-        .from("sm_transacoes")
-        .select("*")
-        .eq("id", initial.id)
-        .single();
-
-      await supabase
-        .from("sm_transacoes")
-        .update({
-          tipo,
-          categoria_id: categoriaId,
-          descricao,
-          valor: novoValor,
-          data: novaData,
-        })
-        .eq("id", initial.id);
-
-      await supabase.from("sm_auditoria").insert({
-        transacao_id: initial.id,
-        acao: "alteracao",
-        justificativa: justificativa.trim(),
-        dados_anteriores: atual ? {
-          tipo: atual.tipo,
-          categoria_id: atual.categoria_id,
-          descricao: atual.descricao,
-          valor: Number(atual.valor),
-          data: atual.data,
-          status: atual.status,
-        } : null,
-        dados_novos: {
-          tipo,
-          categoria_id: categoriaId,
-          descricao,
-          valor: novoValor,
-          data: novaData,
-          status,
-        },
+      const resAtual = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "obter_transacao", payload: { id: initial.id } }),
       });
+      const { data: atual } = await resAtual.json();
+
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "atualizar_transacao",
+          payload: { id: initial.id, tipo, categoria_id: categoriaId, descricao, valor: novoValor, data: novaData },
+        }),
+      });
+
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "inserir_auditoria",
+          payload: {
+            transacao_id: initial.id,
+            acao: "alteracao",
+            justificativa: justificativa.trim(),
+            dados_anteriores: atual ? JSON.stringify({
+              tipo: atual.tipo,
+              categoria_id: atual.categoria_id,
+              descricao: atual.descricao,
+              valor: Number(atual.valor),
+              data: atual.data,
+              status: atual.status,
+            }) : null,
+            dados_novos: JSON.stringify({
+              tipo,
+              categoria_id: categoriaId,
+              descricao,
+              valor: novoValor,
+              data: novaData,
+              status,
+            }),
+          },
+        }),
+      });
+      const audData = await res.json();
+      if (audData.error) {
+        setErro(audData.error);
+        setLoading(false);
+        return;
+      }
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error: insertError } = await supabase.from("sm_transacoes").insert({
-        user_id: user.id,
-        tipo,
-        categoria_id: categoriaId,
-        descricao,
-        valor: novoValor,
-        data: novaData,
-        status,
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "inserir_transacao",
+          payload: {
+            tipo,
+            categoria_id: categoriaId,
+            descricao,
+            valor: novoValor,
+            data: novaData,
+            status,
+          },
+        }),
       });
-      if (insertError) {
-        setErro(insertError.message);
+      const insertData = await res.json();
+      if (insertData.error) {
+        setErro(insertData.error);
         setLoading(false);
         return;
       }

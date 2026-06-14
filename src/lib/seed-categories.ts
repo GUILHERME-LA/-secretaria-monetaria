@@ -1,5 +1,3 @@
-import { createClient } from "./supabase-client";
-
 const CATEGORIAS_PADRAO = [
   { nome: "Salário",       tipo: "receita",  cor: "#22c55e" },
   { nome: "Freela / Extra",tipo: "receita",  cor: "#16a34a" },
@@ -14,18 +12,19 @@ const CATEGORIAS_PADRAO = [
 ];
 
 export async function seedDefaultCategories() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const resCount = await fetch("/api/db", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "contar_categorias", payload: {} }),
+  });
+  const { data: countData } = await resCount.json();
+  if (!countData || countData.total > 0) return;
 
-  const { count } = await supabase
-    .from("sm_categorias")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id);
-
-  if (count === 0) {
-    await supabase.from("sm_categorias").insert(
-      CATEGORIAS_PADRAO.map((c) => ({ ...c, user_id: user.id }))
-    );
+  for (const cat of CATEGORIAS_PADRAO) {
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "inserir_categoria", payload: { nome: cat.nome, tipo: cat.tipo, cor: cat.cor } }),
+    });
   }
 }

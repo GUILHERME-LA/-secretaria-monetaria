@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-client";
 import type { Auditoria } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Header } from "@/components/Header";
@@ -10,16 +9,17 @@ import { Card } from "@/components/ui/Card";
 import { ArrowLeft, LayoutDashboard, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function AuditoriaPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [registros, setRegistros] = useState<(Auditoria & { transacao_descricao?: string })[]>([]);
   const [expandido, setExpandido] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
-      .from("sm_auditoria")
-      .select("*")
-      .order("created_at", { ascending: false })
+    fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_auditoria", payload: {} }),
+    })
+      .then((r) => r.json())
       .then(({ data }: { data: any[] | null }) => {
         if (data) {
           setRegistros(

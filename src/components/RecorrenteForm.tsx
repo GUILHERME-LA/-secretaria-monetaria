@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase-client";
 import { Input } from "./ui/Input";
 import { Button } from "./ui/Button";
 import { CategorySelect } from "./CategorySelect";
@@ -19,7 +18,6 @@ type Props = {
 };
 
 export function RecorrenteForm({ onDone, initial }: Props) {
-  const supabase = createClient();
   const [tipo, setTipo] = useState<"receita" | "despesa">(
     initial?.tipo || "despesa"
   );
@@ -44,16 +42,24 @@ export function RecorrenteForm({ onDone, initial }: Props) {
     };
 
     if (initial?.id) {
-      const { error: updateError } = await supabase.from("sm_recorrentes").update(payload).eq("id", initial.id);
-      if (updateError) { setLoading(false); alert(updateError.message); return; }
-    } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
-      const { error: insertError } = await supabase.from("sm_recorrentes").insert({
-        ...payload,
-        user_id: user.id,
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "atualizar_recorrente", payload: { ...payload, id: initial.id } }),
       });
-      if (insertError) { setLoading(false); alert(insertError.message); return; }
+      const data = await res.json();
+      if (data.error) { setLoading(false); alert(data.error); return; }
+    } else {
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "inserir_recorrente",
+          payload,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { setLoading(false); alert(data.error); return; }
     }
 
     setLoading(false);

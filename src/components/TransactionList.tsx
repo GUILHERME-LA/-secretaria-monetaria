@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase-client";
 import type { Transacao } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card } from "./ui/Card";
@@ -18,7 +17,6 @@ type Props = {
 };
 
 export function TransactionList({ month, refreshKey, currentMonth }: Props) {
-  const supabase = createClient();
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [editItem, setEditItem] = useState<Transacao | null>(null);
   const [deleteItem, setDeleteItem] = useState<Transacao | null>(null);
@@ -30,59 +28,73 @@ export function TransactionList({ month, refreshKey, currentMonth }: Props) {
     const inicio = `${ano}-${String(mes).padStart(2, "0")}-01`;
     const fim = `${ano}-${String(mes).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
 
-    const { data } = await supabase
-      .from("sm_transacoes")
-      .select("*, categorias(nome, cor)")
-      .gte("data", inicio)
-      .lte("data", fim)
-      .order("data", { ascending: false });
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_transacoes_mes", payload: { inicio, fim } }),
+    });
+    const { data } = await res.json();
 
     if (data) {
       setTransacoes(
         data.map((t: any) => ({
           ...t,
-          categoria_nome: t.categorias?.nome,
-          categoria_cor: t.categorias?.cor,
           valor: Number(t.valor),
         }))
       );
     }
-  }, [month, supabase]);
+  }, [month]);
 
   useEffect(() => {
     load();
   }, [load, refreshKey]);
 
   async function confirmar(id: string) {
-    await supabase.from("sm_transacoes").update({ status: "confirmada" }).eq("id", id);
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "confirmar_transacao", payload: { id } }),
+    });
     load();
   }
 
   async function confirmarExclusao() {
     if (!deleteItem || !deleteJustificativa.trim()) return;
 
-    const { data: atual } = await supabase
-      .from("sm_transacoes")
-      .select("*")
-      .eq("id", deleteItem.id)
-      .single();
+    const resAtual = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "obter_transacao", payload: { id: deleteItem.id } }),
+    });
+    const { data: atual } = await resAtual.json();
 
-    await supabase.from("sm_auditoria").insert({
-      transacao_id: deleteItem.id,
-      acao: "exclusao",
-      justificativa: deleteJustificativa.trim(),
-      dados_anteriores: atual ? {
-        tipo: atual.tipo,
-        categoria_id: atual.categoria_id,
-        descricao: atual.descricao,
-        valor: Number(atual.valor),
-        data: atual.data,
-        status: atual.status,
-      } : null,
-      dados_novos: null,
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "inserir_auditoria",
+        payload: {
+          transacao_id: deleteItem.id,
+          acao: "exclusao",
+          justificativa: deleteJustificativa.trim(),
+          dados_anteriores: atual ? JSON.stringify({
+            tipo: atual.tipo,
+            categoria_id: atual.categoria_id,
+            descricao: atual.descricao,
+            valor: Number(atual.valor),
+            data: atual.data,
+            status: atual.status,
+          }) : null,
+          dados_novos: null,
+        },
+      }),
     });
 
-    await supabase.from("sm_transacoes").delete().eq("id", deleteItem.id);
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "excluir_transacao", payload: { id: deleteItem.id } }),
+    });
     setDeleteItem(null);
     setDeleteJustificativa("");
     load();

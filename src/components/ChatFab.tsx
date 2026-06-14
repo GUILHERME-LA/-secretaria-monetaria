@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2, Check, Sparkles } from "lucide-react";
-import { createClient } from "@/lib/supabase-client";
 import { formatCurrency } from "@/lib/utils";
 import { Textarea } from "./ui/Textarea";
 
@@ -22,7 +21,6 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
   const [erro, setErro] = useState("");
   const [success, setSuccess] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const supabase = createClient();
 
   useEffect(() => {
     if (open && inputRef.current) {
@@ -66,15 +64,14 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
     if (!preview) return;
     setLoading(true);
 
-    // Busca categoria pelo nome
-    const { data: cats } = await supabase
-      .from("sm_categorias")
-      .select("id")
-      .eq("nome", preview.categoria)
-      .eq("tipo", preview.tipo)
-      .single();
-
-    const categoria_id = cats?.id;
+    const resCat = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "buscar_categoria", payload: { nome: preview.categoria, tipo: preview.tipo } }),
+    });
+    const { data: cats } = await resCat.json();
+    const catRow = Array.isArray(cats) ? cats[0] : cats;
+    const categoria_id = catRow?.id;
 
     if (!categoria_id) {
       setErro(`Categoria "${preview.categoria}" não encontrada.`);
@@ -82,24 +79,24 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setErro("Usuário não autenticado.");
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from("sm_transacoes").insert({
-      user_id: user.id,
-      tipo: preview.tipo,
-      categoria_id,
-      descricao: preview.descricao,
-      valor: preview.valor,
-      data: preview.data,
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "inserir_transacao",
+        payload: {
+          tipo: preview.tipo,
+          categoria_id,
+          descricao: preview.descricao,
+          valor: preview.valor,
+          data: preview.data,
+          status: "confirmada",
+        },
+      }),
     });
-
-    if (error) {
-      setErro("Erro ao salvar: " + error.message);
+    const data = await res.json();
+    if (data.error) {
+      setErro("Erro ao salvar: " + data.error);
       setLoading(false);
       return;
     }

@@ -1,49 +1,61 @@
 -- ============================================================
--- Migration 001: status column, sm_recorrentes, sm_auditoria
+-- Migration 001: sm → public + RPC functions
 -- Execute no SQL Editor do Supabase Dashboard
 -- ============================================================
 
--- 1. Coluna status em sm_transacoes
-ALTER TABLE sm.sm_transacoes ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'confirmada' CHECK (status IN ('confirmada', 'pendente'));
-CREATE INDEX IF NOT EXISTS idx_sm_transacoes_status ON sm.sm_transacoes(user_id, status);
+-- 1. Move tabelas do schema sm para public
+ALTER TABLE sm.sm_categorias SET SCHEMA public;
+ALTER TABLE sm.sm_transacoes SET SCHEMA public;
+ALTER TABLE IF EXISTS sm.sm_recorrentes SET SCHEMA public;
+ALTER TABLE IF EXISTS sm.sm_auditoria SET SCHEMA public;
 
--- 2. Tabela de contas recorrentes
-CREATE TABLE IF NOT EXISTS sm.sm_recorrentes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  categoria_id UUID NOT NULL REFERENCES sm.sm_categorias(id) ON DELETE RESTRICT,
-  descricao TEXT NOT NULL,
-  valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
-  tipo TEXT NOT NULL CHECK (tipo IN ('receita', 'despesa')),
-  dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 31),
-  ativo BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- 2. Remove RPCs antigas do schema sm
+DROP FUNCTION IF EXISTS sm.inserir_categoria;
+DROP FUNCTION IF EXISTS sm.inserir_transacao;
+DROP FUNCTION IF EXISTS sm.inserir_auditoria;
+DROP FUNCTION IF EXISTS sm.inserir_recorrente;
 
-CREATE INDEX IF NOT EXISTS idx_sm_recorrentes_user ON sm.sm_recorrentes(user_id);
+-- 3. Recria RPCs no public
+CREATE OR REPLACE FUNCTION inserir_categoria(nome TEXT, tipo TEXT, cor TEXT)
+RETURNS UUID AS $$
+  INSERT INTO sm_categorias (user_id, nome, tipo, cor)
+  VALUES (auth.uid(), nome, tipo, cor)
+  RETURNING id;
+$$ LANGUAGE sql SECURITY DEFINER;
 
-ALTER TABLE sm.sm_recorrentes ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION inserir_transacao(
+  tipo TEXT, categoria_id UUID, descricao TEXT, valor NUMERIC, data DATE, status TEXT
+)
+RETURNS UUID AS $$
+  INSERT INTO sm_transacoes (user_id, tipo, categoria_id, descricao, valor, data, status)
+  VALUES (auth.uid(), tipo, categoria_id, descricao, valor, data, status)
+  RETURNING id;
+$$ LANGUAGE sql SECURITY DEFINER;
 
-CREATE POLICY select_own_rec ON sm.sm_recorrentes FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY insert_own_rec ON sm.sm_recorrentes FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY update_own_rec ON sm.sm_recorrentes FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY delete_own_rec ON sm.sm_recorrentes FOR DELETE USING (user_id = auth.uid());
+CREATE OR REPLACE FUNCTION inserir_auditoria(
+  transacao_id UUID, acao TEXT, justificativa TEXT,
+  dados_anteriores JSONB, dados_novos JSONB
+)
+RETURNS UUID AS $$
+  INSERT INTO sm_auditoria (user_id, transacao_id, acao, justificativa, dados_anteriores, dados_novos)
+  VALUES (auth.uid(), transacao_id, acao, justificativa, dados_anteriores, dados_novos)
+  RETURNING id;
+$$ LANGUAGE sql SECURITY DEFINER;
 
--- 3. Tabela de auditoria
-CREATE TABLE IF NOT EXISTS sm.sm_auditoria (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  transacao_id UUID REFERENCES sm.sm_transacoes(id) ON DELETE SET NULL,
-  acao TEXT NOT NULL CHECK (acao IN ('alteracao', 'exclusao')),
-  justificativa TEXT NOT NULL,
-  dados_anteriores JSONB,
-  dados_novos JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+CREATE OR REPLACE FUNCTION inserir_recorrente(
+  categoria_id UUID, descricao TEXT, valor NUMERIC, tipo TEXT, dia_vencimento INTEGER
+)
+RETURNS UUID AS $$
+  INSERT INTO sm_recorrentes (user_id, categoria_id, descricao, valor, tipo, dia_vencimento)
+  VALUES (auth.uid(), categoria_id, descricao, valor, tipo, dia_vencimento)
+  RETURNING id;
+$$ LANGUAGE sql SECURITY DEFINER;
 
-CREATE INDEX IF NOT EXISTS idx_sm_auditoria_user ON sm.sm_auditoria(user_id, created_at DESC);
+-- 4. Permite que as roles chamem as funções
+GRANT EXECUTE ON FUNCTION inserir_categoria TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION inserir_transacao TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION inserir_auditoria TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION inserir_recorrente TO anon, authenticated;
 
-ALTER TABLE sm.sm_auditoria ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY select_own_aud ON sm.sm_auditoria FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY insert_own_aud ON sm.sm_auditoria FOR INSERT WITH CHECK (user_id = auth.uid());
+-- 5. Força recarga do cache do PostgREST
+NOTIFY pgrst, 'reload schema';

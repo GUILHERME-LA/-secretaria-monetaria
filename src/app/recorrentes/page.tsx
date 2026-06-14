@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase-client";
 import type { Recorrente } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { Header } from "@/components/Header";
@@ -13,24 +12,24 @@ import { ArrowLeft, LayoutDashboard, Plus, Pencil, ToggleLeft, ToggleRight } fro
 import { useRouter } from "next/navigation";
 
 export default function RecorrentesPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [recorrentes, setRecorrentes] = useState<(Recorrente & { categoria_nome?: string })[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
 
   async function load() {
-    const { data } = await supabase
-      .from("sm_recorrentes")
-      .select("*, categorias(nome)")
-      .order("dia_vencimento", { ascending: true });
+    const res = await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listar_recorrentes", payload: {} }),
+    });
+    const { data } = await res.json();
 
     if (data) {
       setRecorrentes(
         data.map((r: any) => ({
           ...r,
           valor: Number(r.valor),
-          categoria_nome: r.categorias?.nome,
         }))
       );
     }
@@ -39,7 +38,11 @@ export default function RecorrentesPage() {
   useEffect(() => { load(); }, []);
 
   async function toggleAtivo(r: Recorrente) {
-    await supabase.from("sm_recorrentes").update({ ativo: !r.ativo }).eq("id", r.id);
+    await fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle_recorrente", payload: { id: r.id } }),
+    });
     load();
   }
 
