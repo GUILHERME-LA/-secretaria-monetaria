@@ -40,6 +40,7 @@ export default function MetasPage() {
   const [valorObjetivo, setValorObjetivo] = useState("");
   const [valorAtual, setValorAtual] = useState("");
   const [cor, setCor] = useState(CORES[0]);
+  const [inputs, setInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setMetas(loadMetas());
@@ -237,20 +238,43 @@ export default function MetasPage() {
                       <div className="mt-4 flex gap-2">
                         <Input
                           type="number"
-                          placeholder="Adicionar valor"
+                          placeholder="Valor"
                           className="flex-1 text-sm"
+                          value={inputs[meta.id] ?? ""}
+                          onChange={(e) =>
+                            setInputs((prev) => ({
+                              ...prev,
+                              [meta.id]: e.target.value,
+                            }))
+                          }
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                              const v = Number(
-                                (e.target as HTMLInputElement).value
-                              );
+                              const v = Number(inputs[meta.id]);
                               if (v > 0) {
                                 atualizarValor(meta.id, meta.valorAtual + v);
-                                (e.target as HTMLInputElement).value = "";
+                                setInputs((prev) => ({
+                                  ...prev,
+                                  [meta.id]: "",
+                                }));
                               }
                             }
                           }}
                         />
+                        <button
+                          onClick={() => {
+                            const v = Number(inputs[meta.id]);
+                            if (v > 0) {
+                              atualizarValor(meta.id, meta.valorAtual + v);
+                              setInputs((prev) => ({
+                                ...prev,
+                                [meta.id]: "",
+                              }));
+                            }
+                          }}
+                          className="shrink-0 cursor-pointer rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                        >
+                          + Add
+                        </button>
                       </div>
                     )}
                     {progresso >= 100 && (
