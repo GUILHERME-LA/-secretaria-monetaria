@@ -12,19 +12,11 @@ const CATEGORIAS_PADRAO = [
 ];
 
 export async function seedDefaultCategories() {
-  const resCount = await fetch("/api/db", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "contar_categorias", payload: {} }),
-  });
-  const { data: countData } = await resCount.json();
-  if (!countData || countData.total > 0) return;
-
   for (const cat of CATEGORIAS_PADRAO) {
     await fetch("/api/db", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "inserir_categoria", payload: { nome: cat.nome, tipo: cat.tipo, cor: cat.cor } }),
+      body: JSON.stringify({ action: "seed_categoria", payload: { nome: cat.nome, tipo: cat.tipo, cor: cat.cor } }),
     });
   }
 }

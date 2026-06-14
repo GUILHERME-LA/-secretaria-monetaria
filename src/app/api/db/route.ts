@@ -33,6 +33,11 @@ export async function POST(request: NextRequest) {
       values = [user.id, payload.nome, payload.tipo, payload.cor];
       break;
 
+    case "seed_categoria":
+      sql = `INSERT INTO sm_categorias (user_id, nome, tipo, cor) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, nome, tipo) DO NOTHING`;
+      values = [user.id, payload.nome, payload.tipo, payload.cor];
+      break;
+
     case "inserir_transacao":
       sql = `INSERT INTO sm_transacoes (user_id, tipo, categoria_id, descricao, valor, data, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`;
       values = [user.id, payload.tipo, payload.categoria_id, payload.descricao, payload.valor, payload.data, payload.status || "confirmada"];
@@ -121,11 +126,6 @@ export async function POST(request: NextRequest) {
     case "listar_pendentes_mes":
       sql = `SELECT descricao, tipo, categoria_id FROM sm_transacoes WHERE user_id = $1 AND data >= $2 AND data <= $3 AND status = 'pendente'`;
       values = [user.id, payload.inicio, payload.fim];
-      break;
-
-    case "contar_categorias":
-      sql = `SELECT COUNT(*)::int AS total FROM sm_categorias WHERE user_id = $1`;
-      values = [user.id];
       break;
 
     default:
