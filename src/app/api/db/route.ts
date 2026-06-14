@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
+import { createServerSupabase } from "@/lib/supabase-server";
+import { Pool } from "pg";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1,
+});
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabase();
@@ -8,9 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const admin = createAdminSupabase();
   const { action, payload } = await request.json();
-
   if (!action || !payload) {
     return NextResponse.json({ error: "action e payload são obrigatórios" }, { status: 400 });
   }
@@ -20,149 +24,93 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case "inserir_categoria":
-        result = await admin.from("sm_categorias").insert({
-          user_id: user.id, nome: payload.nome, tipo: payload.tipo, cor: payload.cor,
-        }).select();
-        break;
+        result = await pool.query("SELECT inserir_categoria($1, $2, $3, $4) AS id", [user.id, payload.nome, payload.tipo, payload.cor]);
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
 
       case "seed_categoria":
-        result = await admin.from("sm_categorias").upsert({
-          user_id: user.id, nome: payload.nome, tipo: payload.tipo, cor: payload.cor,
-        }, { onConflict: "user_id, nome, tipo", ignoreDuplicates: true }).select();
-        break;
+        await pool.query("SELECT seed_categoria($1, $2, $3, $4)", [user.id, payload.nome, payload.tipo, payload.cor]);
+        return NextResponse.json({ success: true, data: null });
 
       case "inserir_transacao":
-        result = await admin.from("sm_transacoes").insert({
-          user_id: user.id, tipo: payload.tipo, categoria_id: payload.categoria_id,
-          descricao: payload.descricao, valor: payload.valor,
-          data: payload.data, status: payload.status || "confirmada",
-        }).select();
-        break;
+        result = await pool.query("SELECT inserir_transacao($1, $2, $3, $4, $5, $6, $7) AS id",
+          [user.id, payload.tipo, payload.categoria_id, payload.descricao, payload.valor, payload.data, payload.status || "confirmada"]);
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
 
       case "inserir_auditoria":
-        result = await admin.from("sm_auditoria").insert({
-          user_id: user.id, transacao_id: payload.transacao_id, acao: payload.acao,
-          justificativa: payload.justificativa,
-          dados_anteriores: payload.dados_anteriores,
-          dados_novos: payload.dados_novos,
-        }).select();
-        break;
+        result = await pool.query("SELECT inserir_auditoria($1, $2, $3, $4, $5::jsonb, $6::jsonb) AS id",
+          [user.id, payload.transacao_id, payload.acao, payload.justificativa, payload.dados_anteriores, payload.dados_novos]);
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
 
       case "inserir_recorrente":
-        result = await admin.from("sm_recorrentes").insert({
-          user_id: user.id, categoria_id: payload.categoria_id,
-          descricao: payload.descricao, valor: payload.valor,
-          tipo: payload.tipo, dia_vencimento: payload.dia_vencimento,
-        }).select();
-        break;
+        result = await pool.query("SELECT inserir_recorrente($1, $2, $3, $4, $5, $6) AS id",
+          [user.id, payload.categoria_id, payload.descricao, payload.valor, payload.tipo, payload.dia_vencimento]);
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
 
       case "atualizar_transacao":
-        result = await admin.from("sm_transacoes").update({
-          tipo: payload.tipo, categoria_id: payload.categoria_id,
-          descricao: payload.descricao, valor: payload.valor, data: payload.data,
-        }).eq("id", payload.id).eq("user_id", user.id);
-        break;
+        await pool.query("SELECT atualizar_transacao($1, $2, $3, $4, $5, $6, $7)",
+          [user.id, payload.id, payload.tipo, payload.categoria_id, payload.descricao, payload.valor, payload.data]);
+        return NextResponse.json({ success: true, data: null });
 
       case "confirmar_transacao":
-        result = await admin.from("sm_transacoes").update({
-          status: "confirmada",
-        }).eq("id", payload.id).eq("user_id", user.id);
-        break;
+        await pool.query("SELECT confirmar_transacao($1, $2)", [user.id, payload.id]);
+        return NextResponse.json({ success: true, data: null });
 
       case "excluir_transacao":
-        result = await admin.from("sm_transacoes").delete().eq("id", payload.id).eq("user_id", user.id);
-        break;
+        await pool.query("SELECT excluir_transacao($1, $2)", [user.id, payload.id]);
+        return NextResponse.json({ success: true, data: null });
 
       case "atualizar_recorrente":
-        result = await admin.from("sm_recorrentes").update({
-          tipo: payload.tipo, categoria_id: payload.categoria_id,
-          descricao: payload.descricao, valor: payload.valor,
-          dia_vencimento: payload.dia_vencimento,
-        }).eq("id", payload.id).eq("user_id", user.id);
-        break;
+        await pool.query("SELECT atualizar_recorrente($1, $2, $3, $4, $5, $6, $7)",
+          [user.id, payload.id, payload.tipo, payload.categoria_id, payload.descricao, payload.valor, payload.dia_vencimento]);
+        return NextResponse.json({ success: true, data: null });
 
       case "listar_categorias":
-        result = await admin.from("sm_categorias").select("*")
-          .eq("user_id", user.id).eq("tipo", payload.tipo).order("nome");
-        break;
+        result = await pool.query("SELECT listar_categorias_json($1, $2) AS data", [user.id, payload.tipo]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
-      case "listar_transacoes_mes": {
-        const raw = await admin.from("sm_transacoes").select("*, categorias(nome, cor)")
-          .eq("user_id", user.id)
-          .gte("data", payload.inicio).lte("data", payload.fim)
-          .order("data", { ascending: false });
-        if (raw.error) throw raw.error;
-        const flat = (raw.data || []).map((t: any) => ({
-          ...t, categoria_nome: t.categorias?.nome, categoria_cor: t.categorias?.cor,
-          categorias: undefined,
-        }));
-        return NextResponse.json({ success: true, data: flat });
-      }
+      case "listar_transacoes_mes":
+        result = await pool.query("SELECT listar_transacoes_mes_json($1, $2::date, $3::date) AS data", [user.id, payload.inicio, payload.fim]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
       case "listar_meses":
-        result = await admin.from("sm_transacoes").select("data")
-          .eq("user_id", user.id).order("data");
-        break;
+        result = await pool.query("SELECT listar_meses_json($1) AS data", [user.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
       case "listar_totais_mes":
-        result = await admin.from("sm_transacoes").select("tipo, valor, status")
-          .eq("user_id", user.id)
-          .gte("data", payload.inicio).lte("data", payload.fim);
-        break;
+        result = await pool.query("SELECT listar_totais_mes_json($1, $2::date, $3::date) AS data", [user.id, payload.inicio, payload.fim]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
       case "obter_transacao":
-        result = await admin.from("sm_transacoes").select("*")
-          .eq("id", payload.id).eq("user_id", user.id).single();
-        break;
+        result = await pool.query("SELECT obter_transacao_json($1, $2) AS data", [user.id, payload.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || null });
 
       case "buscar_categoria":
-        result = await admin.from("sm_categorias").select("id")
-          .eq("nome", payload.nome).eq("tipo", payload.tipo)
-          .eq("user_id", user.id).single();
-        break;
+        result = await pool.query("SELECT buscar_categoria_json($1, $2, $3) AS data", [user.id, payload.nome, payload.tipo]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || null });
 
       case "listar_auditoria":
-        result = await admin.from("sm_auditoria").select("*")
-          .eq("user_id", user.id).order("created_at", { ascending: false });
-        break;
+        result = await pool.query("SELECT listar_auditoria_json($1) AS data", [user.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
-      case "listar_recorrentes": {
-        const raw = await admin.from("sm_recorrentes").select("*, categorias(nome)")
-          .eq("user_id", user.id).order("dia_vencimento");
-        if (raw.error) throw raw.error;
-        const flat = (raw.data || []).map((r: any) => ({
-          ...r, categoria_nome: r.categorias?.nome, categorias: undefined,
-        }));
-        return NextResponse.json({ success: true, data: flat });
-      }
+      case "listar_recorrentes":
+        result = await pool.query("SELECT listar_recorrentes_json($1) AS data", [user.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
-      case "toggle_recorrente": {
-        const cur = await admin.from("sm_recorrentes").select("ativo")
-          .eq("id", payload.id).eq("user_id", user.id).single();
-        if (cur.error) throw cur.error;
-        result = await admin.from("sm_recorrentes").update({ ativo: !cur.data.ativo })
-          .eq("id", payload.id);
-        break;
-      }
+      case "toggle_recorrente":
+        await pool.query("SELECT toggle_recorrente($1, $2)", [user.id, payload.id]);
+        return NextResponse.json({ success: true, data: null });
 
       case "listar_recorrentes_ativos":
-        result = await admin.from("sm_recorrentes").select("id, categoria_id, descricao, valor, tipo, dia_vencimento")
-          .eq("user_id", user.id).eq("ativo", true);
-        break;
+        result = await pool.query("SELECT listar_recorrentes_ativos_json($1) AS data", [user.id]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
       case "listar_pendentes_mes":
-        result = await admin.from("sm_transacoes").select("descricao, tipo, categoria_id")
-          .eq("user_id", user.id).eq("status", "pendente")
-          .gte("data", payload.inicio).lte("data", payload.fim);
-        break;
+        result = await pool.query("SELECT listar_pendentes_mes_json($1, $2::date, $3::date) AS data", [user.id, payload.inicio, payload.fim]);
+        return NextResponse.json({ success: true, data: result.rows[0]?.data || [] });
 
       default:
         return NextResponse.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
-
-    if (result?.error) throw result.error;
-    return NextResponse.json({ success: true, data: result?.data || null });
-
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
