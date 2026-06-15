@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { Pool } from "pg";
-import { parseNubankCsv } from "@/lib/parse-nubank-csv";
+import type { ParsedTransaction } from "@/lib/parse-nubank-csv";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -18,18 +18,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return NextResponse.json({ error: "Arquivo não enviado" }, { status: 400 });
-  }
+  const { transactions } = (await request.json()) as {
+    transactions: ParsedTransaction[];
+  };
 
-  const content = await file.text();
-  const transactions = parseNubankCsv(content);
-
-  if (transactions.length === 0) {
+  if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma transação encontrada no arquivo" },
+      { error: "Nenhuma transação enviada" },
       { status: 400 }
     );
   }
@@ -38,6 +33,8 @@ export async function POST(request: NextRequest) {
   let duplicadas = 0;
 
   for (const t of transactions) {
+    if (!t.date || !t.descricao || t.valor == null || isNaN(t.valor)) continue;
+
     const exists = await pool.query(
       `SELECT id FROM sm_transacoes
        WHERE user_id = $1 AND data = $2 AND descricao = $3 AND valor = $4`,
@@ -49,10 +46,15 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    await pool.query(
-      `SELECT inserir_transacao($1, $2, $3, $4, $5, $6, $7)`,
-      [user.id, t.tipo, null, t.descricao, t.valor, t.date, "confirmada"]
-    );
+    await pool.query(`SELECT inserir_transacao($1, $2, $3, $4, $5, $6, $7)`, [
+      user.id,
+      t.tipo,
+      null,
+      t.descricao,
+      t.valor,
+      t.date,
+      "confirmada",
+    ]);
     importadas++;
   }
 

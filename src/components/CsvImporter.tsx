@@ -55,24 +55,10 @@ export function CsvImporter() {
     setError("");
 
     try {
-      const formData = new FormData();
-      const blob = new Blob(
-        [
-          "date,title,amount,category\n" +
-            parsed
-              .map(
-                (t) =>
-                  `${t.date},${t.descricao},${t.tipo === "despesa" ? "-" : ""}${t.valor},${t.categoria_nubank || ""}`
-              )
-              .join("\n"),
-        ],
-        { type: "text/csv" }
-      );
-      formData.append("file", blob, fileName);
-
       const res = await fetch("/api/importar", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactions: parsed }),
       });
       const data = await res.json();
 

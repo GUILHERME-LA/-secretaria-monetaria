@@ -11,24 +11,31 @@ function parseAmount(raw: string): number {
   return parseFloat(cleaned);
 }
 
+function normalizeDate(raw: string): string {
+  const d = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) {
+    const [dd, mm, yy] = d.split("/");
+    return `${yy}-${mm}-${dd}`;
+  }
+  return d;
+}
+
 export function parseNubankCsv(content: string): ParsedTransaction[] {
-  const lines = content.trim().split("\n");
+  let text = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = text.trim().split("\n");
   if (lines.length < 2) return [];
 
-  const header = lines[0].toLowerCase().replace(/"/g, "").trim();
-  const cols = header.split(",").map((c) => c.trim());
+  const headerLine = lines[0].toLowerCase().replace(/"/g, "").trim();
+  const delimiter = headerLine.includes(";") ? ";" : ",";
+  const cols = headerLine.split(delimiter).map((c) => c.trim());
 
-  const isFatura =
-    cols.includes("date") &&
-    cols.includes("title") &&
-    cols.includes("amount");
+  const dateCol = cols.findIndex((c) => c === "date" || c === "data");
+  const titleCol = cols.findIndex((c) => c === "title" || c === "titulo" || c === "título" || c === "estabelecimento" || c === "descrição" || c === "descricao" || c === "description");
+  const amountCol = cols.findIndex((c) => c === "amount" || c === "valor");
+  const categoryCol = cols.findIndex((c) => c === "category" || c === "categoria");
 
-  const isExtrato =
-    cols.includes("date") &&
-    (cols.includes("description") || cols.includes("descricao")) &&
-    cols.includes("amount");
-
-  if (!isFatura && !isExtrato) return [];
+  if (dateCol === -1 || titleCol === -1 || amountCol === -1) return [];
 
   const transactions: ParsedTransaction[] = [];
 
@@ -36,71 +43,26 @@ export function parseNubankCsv(content: string): ParsedTransaction[] {
     const line = lines[i].trim();
     if (!line) continue;
 
-    const cells = line.match(/(".*?"|[^,]+)/g) || [];
+    const cells = line.split(delimiter);
     const clean = cells.map((c) => c.replace(/"/g, "").trim());
 
-    if (isFatura) {
-      const dateIdx = cols.indexOf("date");
-      const titleIdx = cols.indexOf("title");
-      const amountIdx = cols.indexOf("amount");
-      const categoryIdx = cols.indexOf("category");
+    const rawDate = clean[dateCol];
+    const descricao = clean[titleCol];
+    const rawAmount = clean[amountCol];
+    const categoria = categoryCol >= 0 ? clean[categoryCol] : undefined;
 
-      const rawDate = clean[dateIdx];
-      const descricao = clean[titleIdx];
-      const rawAmount = clean[amountIdx];
-      const categoria = categoryIdx >= 0 ? clean[categoryIdx] : undefined;
+    if (!rawDate || !descricao || !rawAmount) continue;
 
-      if (!rawDate || !descricao || !rawAmount) continue;
+    const valor = parseAmount(rawAmount);
+    if (isNaN(valor)) continue;
 
-      const valor = parseAmount(rawAmount);
-      if (isNaN(valor)) continue;
-
-      let dateStr = rawDate;
-      if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-        dateStr = rawDate;
-      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) {
-        const [d, m, y] = rawDate.split("/");
-        dateStr = `${y}-${m}-${d}`;
-      }
-
-      transactions.push({
-        date: dateStr,
-        descricao,
-        valor: Math.abs(valor),
-        tipo: valor < 0 ? "despesa" : "receita",
-        categoria_nubank: categoria || undefined,
-      });
-    } else {
-      const dateIdx = cols.indexOf("date");
-      const descIdx = cols.indexOf("description") !== -1
-        ? cols.indexOf("description")
-        : cols.indexOf("descricao");
-      const amountIdx = cols.indexOf("amount");
-
-      const rawDate = clean[dateIdx];
-      const descricao = clean[descIdx];
-      const rawAmount = clean[amountIdx];
-
-      if (!rawDate || !descricao || !rawAmount) continue;
-
-      const valor = parseAmount(rawAmount);
-      if (isNaN(valor)) continue;
-
-      let dateStr = rawDate;
-      if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-        dateStr = rawDate;
-      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) {
-        const [d, m, y] = rawDate.split("/");
-        dateStr = `${y}-${m}-${d}`;
-      }
-
-      transactions.push({
-        date: dateStr,
-        descricao,
-        valor: Math.abs(valor),
-        tipo: valor < 0 ? "despesa" : "receita",
-      });
-    }
+    transactions.push({
+      date: normalizeDate(rawDate),
+      descricao,
+      valor: Math.abs(valor),
+      tipo: valor < 0 ? "despesa" : "receita",
+      categoria_nubank: categoria || undefined,
+    });
   }
 
   return transactions;
