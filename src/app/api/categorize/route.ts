@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
           { role: "user", content: transactionsText },
         ],
         stream: false,
+        think: false,
         options: { temperature: 0.1 },
       }),
     });
@@ -111,7 +112,8 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await res.json();
-    const text = data?.message?.content || "";
+    const rawText = data?.message?.content || "";
+    const text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
     const jsonStart = text.indexOf("[");
     const jsonEnd = text.lastIndexOf("]");
