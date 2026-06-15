@@ -14,7 +14,7 @@ function buildSystemPrompt(categoriesByType: Record<string, string[]>) {
   const receita = categoriesByType.receita || [];
   const despesa = categoriesByType.despesa || [];
 
-  return `Você é um assistente financeiro que extrai dados de transações de mensagens do usuário.
+  return `Você é um assistente financeiro que extrai dados de transações de mensagens e imagens do usuário.
 
 Categorias existentes do usuário:
 - receita: ${receita.join(", ") || "(nenhuma)"}
@@ -28,6 +28,9 @@ Regras:
 5. Se não tiver certeza, use "Outros"
 6. Considere contexto brasileiro: "mercado" = Alimentação, "uber" = Transporte, "aluguel" = Moradia, "ifood" = Alimentação, "netflix" = Assinaturas, etc.
 7. Se a mensagem não for sobre uma transação financeira, retorne {"erro": "mensagem explicativa"}
+8. Se receber uma imagem (comprovante, nota fiscal, recibo), extraia: valor, descrição do estabelecimento, data, e sugira uma categoria
+9. Para imagens de comprovantes Pix, extraia: valor, destinatário/remetente, data
+10. Para imagens de boletos, extraia: valor, beneficiário, data de vencimento
 
 Responda APENAS com JSON, sem markdown, sem formatação:
 {"tipo":"receita ou despesa","descricao":"texto curto","valor":numero,"categoria":"nome da categoria","data":"YYYY-MM-DD","criar_categoria":false}
@@ -36,7 +39,7 @@ Se criar_categoria=true, a categoria será criada automaticamente.`;
 }
 
 export async function POST(request: NextRequest) {
-  const { message } = await request.json();
+  const { message, image, imageMimeType } = await request.json();
 
   if (!message || typeof message !== "string") {
     return NextResponse.json({ erro: "Mensagem vazia." }, { status: 400 });
@@ -70,6 +73,11 @@ export async function POST(request: NextRequest) {
       categoriesByType[row.tipo]?.push(row.nome);
     }
 
+    const userMessage: any = { role: "user", content: message };
+    if (image && typeof image === "string") {
+      userMessage.images = [image];
+    }
+
     const res = await fetch(OLLAMA_CLOUD_URL, {
       method: "POST",
       headers: {
@@ -80,7 +88,7 @@ export async function POST(request: NextRequest) {
         model: OLLAMA_MODEL,
         messages: [
           { role: "system", content: buildSystemPrompt(categoriesByType) },
-          { role: "user", content: message },
+          userMessage,
         ],
         stream: false,
         options: { temperature: 0.1 },

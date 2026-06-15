@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2, Check, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Check, Sparkles, Paperclip, FileText, Image, FileX } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatCurrency } from "@/lib/utils";
 import { Textarea } from "./ui/Textarea";
@@ -15,6 +15,19 @@ type PreviewData = {
   criar_categoria?: boolean;
 };
 
+type AttachedFile = {
+  file: File;
+  preview?: string;
+  processed?: {
+    type: "image" | "text";
+    content?: string;
+    base64?: string;
+    mimeType?: string;
+    fileName: string;
+    pages?: number;
+  };
+};
+
 export function ChatFab({ onDone }: { onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -22,7 +35,9 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [erro, setErro] = useState("");
   const [success, setSuccess] = useState(false);
+  const [attached, setAttached] = useState<AttachedFile | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open && inputRef.current) {
@@ -47,22 +62,90 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
       setErro("");
       setSuccess(false);
       setMessage("");
+      setAttached(null);
     }
     setOpen((v) => !v);
   }
 
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setErro("Arquivo muito grande (máx. 10MB)");
+      return;
+    }
+
+    const attachedFile: AttachedFile = { file };
+
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        attachedFile.preview = reader.result as string;
+        setAttached(attachedFile);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setAttached(attachedFile);
+    }
+
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function processFile(file: File): Promise<AttachedFile["processed"]> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/process-file", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return data.data;
+  }
+
   async function handleSend() {
-    if (!message.trim() || loading) return;
+    if ((!message.trim() && !attached) || loading) return;
     setLoading(true);
     setErro("");
     setPreview(null);
     setSuccess(false);
 
     try {
+      let fullMessage = message.trim();
+
+      if (attached) {
+        const processed = await processFile(attached.file);
+        if (!processed) throw new Error("Falha ao processar arquivo");
+        setAttached((prev) => (prev ? { ...prev, processed } : null));
+
+        if (processed.type === "image") {
+          fullMessage = fullMessage || "Analise esta imagem e extraia informações de transação financeira (valor, descrição, data, categoria)";
+        } else {
+          const contentPreview = processed.content?.slice(0, 3000) || "";
+          fullMessage = fullMessage
+            ? `${fullMessage}\n\nConteúdo do arquivo "${processed.fileName}":\n${contentPreview}`
+            : `Analise este arquivo e extraia transações financeiras:\n\nConteúdo do arquivo "${processed.fileName}":\n${contentPreview}`;
+        }
+      }
+
+      const body: any = { message: fullMessage };
+
+      if (attached?.processed?.type === "image" && attached.processed.base64) {
+        body.image = attached.processed.base64;
+        body.imageMimeType = attached.processed.mimeType;
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message.trim() }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -75,9 +158,10 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
 
       if (data.success) {
         setPreview(data.transacao);
+        setAttached(null);
       }
-    } catch {
-      setErro("Erro de conexão. Tente novamente.");
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro de conexão. Tente novamente.");
     }
 
     setLoading(false);
@@ -249,27 +333,67 @@ export function ChatFab({ onDone }: { onDone: () => void }) {
                 ) : (
                   <div className="flex flex-col gap-3">
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Descreva o gasto ou receita do seu jeito:
+                      Descreva o gasto, ou anexe um comprovante:
                     </p>
-                    <Textarea
-                      ref={inputRef}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Ex: comprei um sorvete de 10 reais"
-                      style={{ fontSize: 16, WebkitTextSizeAdjust: "100%" }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                    />
+
+                    {attached && (
+                      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--muted)]/50 px-3 py-2">
+                        {attached.file.type.startsWith("image/") ? (
+                          <Image size={14} className="shrink-0 text-[var(--accent)]" />
+                        ) : (
+                          <FileText size={14} className="shrink-0 text-[var(--accent)]" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate text-xs text-[var(--foreground)]">
+                          {attached.file.name}
+                        </span>
+                        {attached.processed && (
+                          <Check size={12} className="shrink-0 text-green-500" />
+                        )}
+                        <button
+                          onClick={() => setAttached(null)}
+                          className="shrink-0 cursor-pointer text-[var(--muted-foreground)] hover:text-red-500 transition-colors"
+                        >
+                          <FileX size={14} />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex items-end gap-2">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*,.pdf,.csv,.txt"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                      <button
+                        onClick={() => fileRef.current?.click()}
+                        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+                        title="Anexar arquivo"
+                      >
+                        <Paperclip size={16} />
+                      </button>
+                      <Textarea
+                        ref={inputRef}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder={attached ? "O que fazer com este arquivo?" : "Ex: comprei um sorvete de 10 reais"}
+                        style={{ fontSize: 16, WebkitTextSizeAdjust: "100%" }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                      />
+                    </div>
+
                     {erro && (
                       <p className="text-xs text-red-500">{erro}</p>
                     )}
                     <button
                       onClick={handleSend}
-                      disabled={!message.trim() || loading}
+                      disabled={(!message.trim() && !attached) || loading}
                       className="min-h-[44px] flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-40"
                     >
                       {loading ? (
