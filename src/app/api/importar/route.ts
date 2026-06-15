@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { Pool } from "pg";
-import type { ParsedTransaction } from "@/lib/parse-nubank-csv";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 1,
 });
+
+interface Transaction {
+  date: string;
+  descricao: string;
+  valor: number;
+  tipo: "receita" | "despesa";
+  categoria_nubank?: string;
+  identificador?: string;
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabase();
@@ -19,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { transactions } = (await request.json()) as {
-    transactions: ParsedTransaction[];
+    transactions: Transaction[];
   };
 
   if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
