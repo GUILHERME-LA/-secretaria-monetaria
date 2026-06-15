@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Repeat, History, HelpCircle, Menu, Target, BarChart3 } from "lucide-react";
+import { Repeat, History, HelpCircle, Menu, Target, BarChart3, Upload } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
 import { SideDrawer } from "./SideDrawer";
@@ -10,6 +10,7 @@ import { SideDrawer } from "./SideDrawer";
 const navLinks = [
   { href: "/recorrentes", label: "Recorrentes", icon: Repeat },
   { href: "/auditoria", label: "Histórico", icon: History },
+  { href: "/importar", label: "Importar", icon: Upload },
   { href: "/metas", label: "Metas", icon: Target },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { href: "/ajuda", label: "Ajuda", icon: HelpCircle },
