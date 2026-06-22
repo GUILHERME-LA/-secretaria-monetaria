@@ -28,8 +28,8 @@ export function ExpensePieChart({ data }: Props) {
       <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
         Gastos por Categoria
       </h3>
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8">
-        <div className="relative w-full shrink-0 sm:w-48">
+      <div className="flex flex-col items-center gap-5">
+        <div className="relative mx-auto w-44">
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -75,7 +75,7 @@ export function ExpensePieChart({ data }: Props) {
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-2.5 overflow-hidden sm:flex-1 sm:min-w-0">
+        <div className="flex w-full flex-col gap-2.5">
           {data.map((item) => {
             const pct = (item.valor / total) * 100;
             return (
@@ -87,13 +87,13 @@ export function ExpensePieChart({ data }: Props) {
                 <span className="min-w-0 flex-1 truncate text-[var(--muted-foreground)]">
                   {item.nome}
                 </span>
-                <div className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-[var(--muted)] sm:w-16">
+                <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--muted)] sm:w-20">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${pct}%`, backgroundColor: item.cor }}
                   />
                 </div>
-                <span className="w-10 shrink-0 text-right text-[11px] font-medium text-[var(--foreground)] tabular-nums">
+                <span className="w-12 shrink-0 text-right text-[11px] font-medium text-[var(--foreground)] tabular-nums">
                   {pct.toFixed(1)}%
                 </span>
               </div>
