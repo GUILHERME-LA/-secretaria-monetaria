@@ -75,7 +75,7 @@ export function ExpensePieChart({ data }: Props) {
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-2.5 sm:flex-1 sm:min-w-0">
+        <div className="flex w-full flex-col gap-2.5 overflow-hidden sm:flex-1 sm:min-w-0">
           {data.map((item) => {
             const pct = (item.valor / total) * 100;
             return (
@@ -87,13 +87,13 @@ export function ExpensePieChart({ data }: Props) {
                 <span className="min-w-0 flex-1 truncate text-[var(--muted-foreground)]">
                   {item.nome}
                 </span>
-                <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--muted)] sm:w-20">
+                <div className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-[var(--muted)] sm:w-16">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${pct}%`, backgroundColor: item.cor }}
                   />
                 </div>
-                <span className="w-12 shrink-0 text-right font-medium text-[var(--foreground)] tabular-nums">
+                <span className="w-10 shrink-0 text-right text-[11px] font-medium text-[var(--foreground)] tabular-nums">
                   {pct.toFixed(1)}%
                 </span>
               </div>
