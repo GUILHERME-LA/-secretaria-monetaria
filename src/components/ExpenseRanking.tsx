@@ -48,7 +48,10 @@ export function ExpenseRanking({ data }: Props) {
                 {formatCurrency(item.valor)}
               </span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-[var(--muted)]">
+            <div
+              className="h-3 overflow-hidden rounded-full"
+              style={{ backgroundColor: `${item.cor}20` }}
+            >
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{

@@ -169,7 +169,7 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-[var(--foreground)]">
+                    <p className="truncate font-medium text-[var(--foreground)]/80">
                       {t.descricao}
                     </p>
                     {t.status === "pendente" && (
@@ -183,10 +183,11 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                 {/* Col 2: Category badge */}
                 <div className="col-span-3 lg:col-span-2">
                   <span
-                    className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium"
                     style={{
-                      backgroundColor: `${t.categoria_cor || "#6366f1"}20`,
+                      backgroundColor: `${t.categoria_cor || "#6366f1"}15`,
                       color: t.categoria_cor || "#6366f1",
+                      borderColor: `${t.categoria_cor || "#6366f1"}25`,
                     }}
                   >
                     {t.categoria_nome}

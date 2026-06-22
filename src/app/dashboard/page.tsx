@@ -393,14 +393,14 @@ export default function DashboardPage() {
         </div>
 
         {prefs.charts && (
-          <div className="mt-8 flex flex-wrap gap-6">
-            <div className="min-w-[280px] flex-[2]">
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-4">
               <ExpensePieChart data={pieData} />
               <div className="mt-6">
                 <ExpenseRanking data={rankingData} />
               </div>
             </div>
-            <div className="min-w-[400px] flex-[3]">
+            <div className="lg:col-span-8">
               <MonthlyBarChart
                 data={comparativo}
                 previstoData={mostrarPrevistas ? comparativoTotal : undefined}
