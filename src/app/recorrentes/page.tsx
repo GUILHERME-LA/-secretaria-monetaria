@@ -9,8 +9,25 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { RecorrenteForm } from "@/components/RecorrenteForm";
-import { Plus, Pencil, ToggleLeft, ToggleRight, Repeat, ArrowRight, HelpCircle, Trash2 } from "lucide-react";
+import { Plus, Pencil, Repeat, HelpCircle, Trash2, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+function daysUntil(day: number): number {
+  const hoje = new Date();
+  const currentDay = hoje.getDate();
+  const target =
+    day >= currentDay
+      ? new Date(hoje.getFullYear(), hoje.getMonth(), day)
+      : new Date(hoje.getFullYear(), hoje.getMonth() + 1, day);
+  return Math.ceil((target.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function daysLabel(day: number): string {
+  const d = daysUntil(day);
+  if (d === 0) return "Vence hoje";
+  if (d === 1) return "Vence amanhã";
+  return `Faltam ${d} dias`;
+}
 
 export default function RecorrentesPage() {
   const router = useRouter();
@@ -19,6 +36,7 @@ export default function RecorrentesPage() {
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [tipoFilter, setTipoFilter] = useState<"todas" | "receita" | "despesa">("todas");
 
   async function load() {
     const res = await fetch("/api/db", {
@@ -27,11 +45,8 @@ export default function RecorrentesPage() {
       body: JSON.stringify({ action: "listar_recorrentes", payload: {} }),
     });
     const { data } = await res.json();
-
     if (data) {
-      setRecorrentes(
-        data.map((r: any) => ({ ...r, valor: Number(r.valor) }))
-      );
+      setRecorrentes(data.map((r: any) => ({ ...r, valor: Number(r.valor) })));
     }
   }
 
@@ -56,12 +71,20 @@ export default function RecorrentesPage() {
     load();
   }
 
-  const ativos = recorrentes.filter((r) => r.ativo);
+  const filtrados =
+    tipoFilter === "todas"
+      ? recorrentes
+      : recorrentes.filter((r) => r.tipo === tipoFilter);
+
+  const ativos = filtrados.filter((r) => r.ativo);
+  const inativos = filtrados.filter((r) => !r.ativo);
   const totalMensal = ativos.reduce((s, r) => s + r.valor, 0);
-  const proximasReceitas = ativos
+
+  const todosAtivos = recorrentes.filter((r) => r.ativo);
+  const proximasReceitas = todosAtivos
     .filter((r) => r.tipo === "receita")
     .sort((a, b) => a.dia_vencimento - b.dia_vencimento);
-  const proximasDespesas = ativos
+  const proximasDespesas = todosAtivos
     .filter((r) => r.tipo === "despesa")
     .sort((a, b) => a.dia_vencimento - b.dia_vencimento);
   const proximoEvento =
@@ -85,9 +108,9 @@ export default function RecorrentesPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            {recorrentes.length - ativos.length > 0 && (
+            {recorrentes.length - todosAtivos.length > 0 && (
               <Button variant="secondary" onClick={() => setConfirmDeleteOpen(true)}>
-                <Trash2 size={18} /> Limpar {recorrentes.length - ativos.length} inativa{(recorrentes.length - ativos.length) !== 1 ? 's' : ''}
+                <Trash2 size={18} /> Limpar {recorrentes.length - todosAtivos.length} inativa{(recorrentes.length - todosAtivos.length) !== 1 ? 's' : ''}
               </Button>
             )}
             <Button
@@ -115,7 +138,7 @@ export default function RecorrentesPage() {
                 {recorrentes.length}
               </p>
               <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-                {ativos.length} ativas · {recorrentes.length - ativos.length} inativas
+                {todosAtivos.length} ativas · {recorrentes.length - todosAtivos.length} inativas
               </p>
             </Card>
           </motion.div>
@@ -132,7 +155,7 @@ export default function RecorrentesPage() {
                 {formatCurrency(totalMensal)}
               </p>
               <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-                {formatCurrency(ativos.filter((r) => r.tipo === "receita").reduce((s, r) => s + r.valor, 0))} em receitas
+                {formatCurrency(todosAtivos.filter((r) => r.tipo === "receita").reduce((s, r) => s + r.valor, 0))} em receitas
               </p>
             </Card>
           </motion.div>
@@ -151,7 +174,7 @@ export default function RecorrentesPage() {
                     {proximoEvento.descricao}
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-                    Dia {proximoEvento.dia_vencimento} · {formatCurrency(proximoEvento.valor)}
+                    {daysLabel(proximoEvento.dia_vencimento)} · {formatCurrency(proximoEvento.valor)}
                     <span className={`ml-1.5 inline-block h-2 w-2 rounded-full ${proximoEvento.tipo === "receita" ? "bg-green-500" : "bg-red-500"}`} />
                   </p>
                 </>
@@ -209,89 +232,108 @@ export default function RecorrentesPage() {
               >
                 <Plus size={18} /> Criar primeira recorrência
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => router.push("/ajuda")}
-              >
+              <Button variant="secondary" onClick={() => router.push("/ajuda")}>
                 <HelpCircle size={16} /> Saiba mais
               </Button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {recorrentes.map((r, idx) => (
-              <motion.div
-                key={r.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03, duration: 0.2 }}
-              >
-                <Card
-                  className={`flex items-center justify-between transition-all hover:translate-x-0.5 ${
-                    !r.ativo ? "opacity-50" : ""
+          <>
+            <div className="mb-4 flex gap-2">
+              {(["todas", "receita", "despesa"] as const).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => setTipoFilter(tipo)}
+                  className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    tipoFilter === tipo
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                      : "border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[var(--accent)]"
                   }`}
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                        r.tipo === "receita" ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-[var(--foreground)]">
-                        {r.descricao}
-                      </p>
-                      <p className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{ backgroundColor: r.categoria_cor || "#6366f1" }}
-                        />
-                        {r.categoria_nome}
-                        <span>· Dia {r.dia_vencimento}</span>
-                        <span>· {r.tipo === "receita" ? "Receita" : "Despesa"}</span>
-                      </p>
+                  {tipo === "todas" ? "Todas" : tipo === "receita" ? "Receitas" : "Despesas"}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {[...ativos, ...inativos].map((r, idx) => (
+                <motion.div
+                  key={r.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.03, duration: 0.2 }}
+                >
+                  <Card
+                    className={`flex items-center justify-between transition-all hover:translate-x-0.5 ${
+                      !r.ativo ? "opacity-50" : ""
+                    }`}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                          r.tipo === "receita" ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-[var(--foreground)]">
+                          {r.descricao}
+                        </p>
+                        <p className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: r.categoria_cor || "#6366f1" }}
+                          />
+                          {r.categoria_nome}
+                          <span>· {daysLabel(r.dia_vencimento)}</span>
+                          <span>· {r.tipo === "receita" ? "Receita" : "Despesa"}</span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 pl-3">
-                    <span
-                      className={`shrink-0 font-semibold ${
-                        r.tipo === "receita" ? "text-green-500" : "text-red-500"
-                      }`}
-                    >
-                      {formatCurrency(r.valor)}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setEditItem({
-                          id: r.id,
-                          tipo: r.tipo,
-                          categoria_id: r.categoria_id,
-                          descricao: r.descricao,
-                          valor: String(r.valor),
-                          dia_vencimento: r.dia_vencimento,
-                        });
-                        setOpen(true);
-                      }}
-                      className="cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => toggleAtivo(r)}
-                      className="cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
-                      title={r.ativo ? "Desativar" : "Ativar"}
-                    >
-                      {r.ativo ? (
-                        <ToggleRight size={18} className="text-green-500" />
-                      ) : (
-                        <ToggleLeft size={18} />
-                      )}
-                    </button>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                    <div className="flex shrink-0 items-center gap-1 pl-3">
+                      <span
+                        className={`shrink-0 font-semibold tabular-nums ${
+                          r.tipo === "receita" ? "text-green-500" : "text-red-500"
+                        }`}
+                      >
+                        {formatCurrency(r.valor)}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEditItem({
+                            id: r.id,
+                            tipo: r.tipo,
+                            categoria_id: r.categoria_id,
+                            descricao: r.descricao,
+                            valor: String(r.valor),
+                            dia_vencimento: r.dia_vencimento,
+                          });
+                          setOpen(true);
+                        }}
+                        className="cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        role="switch"
+                        aria-checked={r.ativo}
+                        onClick={() => toggleAtivo(r)}
+                        className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${
+                          r.ativo ? "bg-green-500" : "bg-[var(--muted)]"
+                        }`}
+                        title={r.ativo ? "Desativar" : "Ativar"}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${
+                            r.ativo ? "translate-x-[18px]" : "translate-x-[2px]"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 p-4 sm:p-5">
@@ -326,7 +368,7 @@ export default function RecorrentesPage() {
       <Modal open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} title="Limpar recorrências inativas">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-[var(--foreground)]">
-            Tem certeza que deseja apagar permanentemente <strong>{recorrentes.length - ativos.length} recorrência{(recorrentes.length - ativos.length) !== 1 ? 's' : ''} inativa{(recorrentes.length - ativos.length) !== 1 ? 's' : ''}</strong>?
+            Tem certeza que deseja apagar permanentemente <strong>{recorrentes.length - todosAtivos.length} recorrência{(recorrentes.length - todosAtivos.length) !== 1 ? 's' : ''} inativa{(recorrentes.length - todosAtivos.length) !== 1 ? 's' : ''}</strong>?
           </p>
           <p className="text-xs text-[var(--muted-foreground)]">
             Esta ação não pode ser desfeita.

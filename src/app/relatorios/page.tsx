@@ -5,16 +5,19 @@ import { motion } from "framer-motion";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { FileText, FileSpreadsheet, Loader2, BarChart3, ArrowRight } from "lucide-react";
+import { FileText, FileSpreadsheet, Loader2, BarChart3, ArrowRight, Lightbulb, PieChart, List } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { MonthSelector } from "@/components/MonthSelector";
 import { ExpensePieChart } from "@/components/ExpensePieChart";
 import { ExpenseRanking } from "@/components/ExpenseRanking";
 import { TransactionList } from "@/components/TransactionList";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { formatCurrency, getCurrentMonth, getMonthBounds, getLast6Months, monthLabel } from "@/lib/utils";
+import type { Insight } from "@/lib/insights-engine";
+
+const CORES_PALETA = ["#6366f1", "#8b5cf6", "#f97316", "#06b6d4", "#ec4899", "#eab308", "#14b8a6", "#3b82f6", "#d946ef", "#78716c"];
 
 export default function RelatoriosPage() {
   const hoje = getCurrentMonth();
@@ -27,6 +30,9 @@ export default function RelatoriosPage() {
   const [rankingData, setRankingData] = useState<{ nome: string; cor: string; valor: number }[]>([]);
   const [transacoes, setTransacoes] = useState<any[]>([]);
   const [comparativo, setComparativo] = useState<{ mes: string; receitas: number; despesas: number }[]>([]);
+  const [insight, setInsight] = useState<Insight | null>(null);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [showFiltradas, setShowFiltradas] = useState(false);
 
   const loadMonths = useCallback(async () => {
     const res = await fetch("/api/db", {
@@ -43,6 +49,9 @@ export default function RelatoriosPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setCategoriaFiltro(null);
+    setShowFiltradas(false);
+    setInsight(null);
     const { inicio, fim } = getMonthBounds(month);
 
     const res = await fetch("/api/db", {
@@ -98,13 +107,38 @@ export default function RelatoriosPage() {
   useEffect(() => { loadMonths(); }, [loadMonths]);
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    if (!receitas && !despesas) return;
+    fetch("/api/insights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        receitas,
+        despesas,
+        variacaoReceitas: null,
+        variacaoDespesas: null,
+        pieData,
+        recentMonths: comparativo,
+      }),
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && res.data?.length > 0) setInsight(res.data[0]);
+      })
+      .catch(() => {});
+  }, [receitas, despesas, pieData, comparativo]);
+
+  function handleCategoriaClick(nome: string) {
+    setCategoriaFiltro(categoriaFiltro === nome ? null : nome);
+    setShowFiltradas(true);
+  }
+
   function exportPDF() {
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text("Relatório Financeiro", 14, 22);
     doc.setFontSize(10);
     doc.text(`Período: ${monthLabel(month)}`, 14, 30);
-
     doc.setFontSize(12);
     doc.text("Resumo", 14, 42);
     autoTable(doc, {
@@ -118,7 +152,6 @@ export default function RelatoriosPage() {
       theme: "grid",
       headStyles: { fillColor: "#6366f1" },
     });
-
     doc.setFontSize(12);
     const yPos = (doc as any).lastAutoTable.finalY + 10;
     doc.text("Transações", 14, yPos);
@@ -136,7 +169,6 @@ export default function RelatoriosPage() {
       theme: "grid",
       headStyles: { fillColor: "#6366f1" },
     });
-
     doc.save(`relatorio-${month}.pdf`);
   }
 
@@ -159,7 +191,6 @@ export default function RelatoriosPage() {
         t.status === "confirmada" ? "Confirmada" : "Pendente",
       ]),
     ];
-
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Relatório");
@@ -167,6 +198,14 @@ export default function RelatoriosPage() {
   }
 
   const temDados = receitas > 0 || despesas > 0 || transacoes.length > 0;
+
+  const insightStyle = insight
+    ? {
+        negative: { bg: "bg-red-500/8", border: "border-red-500/20" },
+        positive: { bg: "bg-emerald-500/8", border: "border-emerald-500/20" },
+        info: { bg: "bg-[var(--accent)]/8", border: "border-[var(--accent)]/20" },
+      }[insight.type] || { bg: "bg-[var(--accent)]/8", border: "border-[var(--accent)]/20" }
+    : null;
 
   return (
     <>
@@ -176,8 +215,7 @@ export default function RelatoriosPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Relatórios</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Visualize tendências, exporte dados e tome decisões financeiras
-              mais informadas.
+              Visualize tendências, exporte dados e tome decisões financeiras mais informadas.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -206,10 +244,7 @@ export default function RelatoriosPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
               <Loader2 className="h-8 w-8 text-[var(--accent)]" />
             </motion.div>
           </div>
@@ -218,27 +253,14 @@ export default function RelatoriosPage() {
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--muted)]">
               <BarChart3 size={32} className="text-[var(--muted-foreground)]" />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-[var(--foreground)]">
-              Nenhum dado no período
-            </h2>
+            <h2 className="mb-2 text-xl font-bold text-[var(--foreground)]">Nenhum dado no período</h2>
             <p className="mb-6 max-w-md text-sm text-[var(--muted-foreground)]">
-              Selecione outro mês com transações registradas ou cadastre suas
-              primeiras receitas e despesas para gerar relatórios completos.
+              Selecione outro mês com transações registradas ou cadastre suas primeiras receitas e despesas para gerar relatórios completos.
             </p>
             <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-4">
-              {[
-                ["1", "Cadastre transações"],
-                ["2", "Selecione o período"],
-                ["3", "Analise os gráficos"],
-                ["4", "Exporte em PDF/Excel"],
-              ].map(([num, text]) => (
-                <div
-                  key={num}
-                  className="flex items-center gap-2 rounded-xl bg-[var(--muted)]/50 px-4 py-3 text-sm"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">
-                    {num}
-                  </span>
+              {[["1", "Cadastre transações"], ["2", "Selecione o período"], ["3", "Analise os gráficos"], ["4", "Exporte em PDF/Excel"]].map(([num, text]) => (
+                <div key={num} className="flex items-center gap-2 rounded-xl bg-[var(--muted)]/50 px-4 py-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">{num}</span>
                   <span className="text-[var(--foreground)]">{text}</span>
                 </div>
               ))}
@@ -246,32 +268,34 @@ export default function RelatoriosPage() {
           </div>
         ) : (
           <>
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {insight && (
               <motion.div
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
+                className={`mb-8 flex min-w-0 items-start gap-3 rounded-xl border px-4 py-3 ${insightStyle?.bg} ${insightStyle?.border}`}
               >
+                <span className="mt-0.5 block text-lg leading-none">{insight.icon}</span>
+                <div>
+                  <p className="text-xs font-semibold text-[var(--foreground)]">{insight.title}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{insight.description}</p>
+                </div>
+              </motion.div>
+            )}
+
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                 <Card>
                   <p className="text-xs font-medium text-[var(--muted-foreground)]">Receitas</p>
                   <p className="mt-1 text-2xl font-bold text-green-500">{formatCurrency(receitas)}</p>
                 </Card>
               </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05, duration: 0.2 }}
-              >
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.2 }}>
                 <Card>
                   <p className="text-xs font-medium text-[var(--muted-foreground)]">Despesas</p>
                   <p className="mt-1 text-2xl font-bold text-red-500">{formatCurrency(despesas)}</p>
                 </Card>
               </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.2 }}
-              >
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.2 }}>
                 <Card>
                   <p className="text-xs font-medium text-[var(--muted-foreground)]">Saldo</p>
                   <p className={`mt-1 text-2xl font-bold ${receitas - despesas >= 0 ? "text-green-500" : "text-red-500"}`}>
@@ -282,11 +306,41 @@ export default function RelatoriosPage() {
             </div>
 
             <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ExpensePieChart data={pieData} />
-              <ExpenseRanking data={rankingData} />
+              <div className="cursor-pointer" onClick={() => {}}>
+                <ExpensePieChart data={pieData} />
+              </div>
+              <div>
+                <ExpenseRanking data={rankingData} onCategoryClick={handleCategoriaClick} activeCategory={categoriaFiltro} />
+              </div>
             </div>
 
-            <CategoryBreakdown transactions={transacoes} tipo="despesa" />
+            {showFiltradas && categoriaFiltro && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 flex items-center gap-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-4 py-2"
+              >
+                <List size={14} style={{ color: "var(--accent)" }} />
+                <p className="text-xs text-[var(--foreground)]">
+                  Transações filtradas por: <span className="font-semibold">{categoriaFiltro}</span>
+                </p>
+                <button
+                  onClick={() => { setCategoriaFiltro(null); setShowFiltradas(false); }}
+                  className="ml-auto cursor-pointer text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] underline transition-colors"
+                >
+                  Limpar filtro
+                </button>
+              </motion.div>
+            )}
+
+            <div className="mb-8">
+              <CategoryBreakdown
+                transactions={transacoes}
+                tipo="despesa"
+                categoriaFiltro={categoriaFiltro}
+                onCategoriaClick={handleCategoriaClick}
+              />
+            </div>
 
             <TransactionList month={month} refreshKey={0} />
 
@@ -296,14 +350,9 @@ export default function RelatoriosPage() {
                   <ArrowRight size={16} style={{ color: "var(--accent)" }} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[var(--foreground)]">
-                    Relatórios para decisões melhores
-                  </p>
+                  <p className="text-sm font-medium text-[var(--foreground)]">Relatórios para decisões melhores</p>
                   <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">
-                    Use os relatórios para identificar padrões de gastos,
-                    comparar meses e tomar decisões financeiras baseadas em
-                    dados reais. Exporte em PDF para compartilhar ou Excel
-                    para análises mais detalhadas.
+                    Use os relatórios para identificar padrões de gastos, comparar meses e tomar decisões financeiras baseadas em dados reais. Exporte em PDF para compartilhar ou Excel para análises mais detalhadas.
                   </p>
                 </div>
               </div>

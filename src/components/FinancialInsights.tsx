@@ -47,7 +47,7 @@ export function FinancialInsights({ insights, loading }: Props) {
         <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
           Insights
         </h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-3">
           <Skeleton />
           <Skeleton />
           <Skeleton />
@@ -71,7 +71,7 @@ export function FinancialInsights({ insights, loading }: Props) {
       <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
         Insights
       </h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="flex flex-col gap-3">
         {insights.map((item, idx) => {
           const style = typeStyles[item.type] || typeStyles.info;
           const isExpanded = expanded.has(item.id);
@@ -89,7 +89,7 @@ export function FinancialInsights({ insights, loading }: Props) {
                   {item.title}
                 </p>
                 <p
-                  className={`mt-0.5 text-xs text-[var(--muted-foreground)] ${
+                  className={`mt-0.5 text-xs text-slate-400 ${
                     !isExpanded ? "line-clamp-2" : ""
                   }`}
                 >

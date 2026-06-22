@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { Calendar, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCurrency } from "@/lib/utils";
 
 type Evento = {
@@ -35,11 +34,28 @@ export function FinancialCalendar({ eventos }: Props) {
 
   if (sorted.length === 0) {
     return (
-      <EmptyState
-        icon={Calendar}
-        title="Nenhum evento futuro"
-        description="Crie contas recorrentes para ver aqui os próximos vencimentos."
-      />
+      <Card>
+        <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
+          Próximos Eventos
+        </h3>
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent)]/10">
+            <Calendar size={26} className="text-[var(--accent)]" />
+          </div>
+          <p className="text-sm font-medium text-[var(--foreground)]">
+            Nenhum evento futuro
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+            Crie contas recorrentes para ver aqui os próximos vencimentos.
+          </p>
+          <a
+            href="/recorrentes"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
+          >
+            📅 Agendar transação
+          </a>
+        </div>
+      </Card>
     );
   }
 
@@ -79,7 +95,7 @@ export function FinancialCalendar({ eventos }: Props) {
                 <p className="truncate font-medium text-[var(--foreground)]">
                   {ev.descricao}
                 </p>
-                <p className="text-xs text-[var(--muted-foreground)]">
+                <p className="text-xs text-slate-400">
                   {new Date(ev.data + "T12:00:00").toLocaleDateString("pt-BR")}
                 </p>
               </div>
@@ -94,7 +110,7 @@ export function FinancialCalendar({ eventos }: Props) {
                 </span>
                 <span
                   className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${
-                    urgente ? "text-red-500" : "text-[var(--muted-foreground)]"
+                    urgente ? "text-red-500" : "text-slate-400"
                   }`}
                 >
                   {urgente && <AlertCircle size={10} />}

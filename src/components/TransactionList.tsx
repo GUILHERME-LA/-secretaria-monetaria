@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { Transacao } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card } from "./ui/Card";
@@ -9,7 +9,12 @@ import { Button } from "./ui/Button";
 import { Modal } from "./ui/Modal";
 import { TransactionForm } from "./TransactionForm";
 import { Textarea } from "./ui/Textarea";
-import { Pencil, Trash2, Check, ArrowUp, ArrowDown, List, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Pencil, Trash2, Check, ArrowUp, ArrowDown, List,
+  ChevronLeft, ChevronRight, Search, RotateCcw,
+  ArrowUpDown, ArrowUpWideNarrow, ArrowDownWideNarrow,
+  X,
+} from "lucide-react";
 
 type Props = {
   month: string;
@@ -20,12 +25,20 @@ type Props = {
 
 const PER_PAGE = 10;
 
+type SortColumn = "data" | "descricao" | "valor" | "categoria";
+type SortDir = "asc" | "desc";
+
 export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: Props) {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [editItem, setEditItem] = useState<Transacao | null>(null);
   const [deleteItem, setDeleteItem] = useState<Transacao | null>(null);
   const [deleteJustificativa, setDeleteJustificativa] = useState("");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"todas" | "receita" | "despesa">("todas");
+  const [categoriaFilter, setCategoriaFilter] = useState("todas");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("data");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const load = useCallback(async () => {
     const [ano, mes] = month.split("-").map(Number);
@@ -53,7 +66,7 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
 
   useEffect(() => {
     setPage(1);
-  }, [transacoes.length]);
+  }, [search, tipoFilter, categoriaFilter, sortColumn, sortDir]);
 
   async function confirmar(id: string) {
     await fetch("/api/db", {
@@ -108,9 +121,80 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
     onRefresh?.();
   }
 
-  const sorted = [...transacoes].sort((a, b) => b.data.localeCompare(a.data));
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
-  const paginated = sorted.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  function toggleSort(col: SortColumn) {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(col);
+      setSortDir(col === "data" ? "desc" : "asc");
+    }
+  }
+
+  function SortIcon({ col }: { col: SortColumn }) {
+    if (sortColumn !== col) return <ArrowUpDown size={12} className="opacity-30" />;
+    return sortDir === "asc" ? (
+      <ArrowUpWideNarrow size={12} className="text-[var(--accent)]" />
+    ) : (
+      <ArrowDownWideNarrow size={12} className="text-[var(--accent)]" />
+    );
+  }
+
+  const categorias = useMemo(() => {
+    const unique = new Map<string, string>();
+    transacoes.forEach((t) => {
+      if (t.categoria_nome) unique.set(t.categoria_nome, t.categoria_cor || "#6366f1");
+    });
+    return Array.from(unique.entries()).map(([nome, cor]) => ({ nome, cor }));
+  }, [transacoes]);
+
+  const filtered = useMemo(() => {
+    let result = [...transacoes];
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((t) => t.descricao.toLowerCase().includes(q));
+    }
+
+    if (tipoFilter !== "todas") {
+      result = result.filter((t) => t.tipo === tipoFilter);
+    }
+
+    if (categoriaFilter !== "todas") {
+      result = result.filter((t) => t.categoria_nome === categoriaFilter);
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortColumn) {
+        case "data":
+          cmp = a.data.localeCompare(b.data);
+          break;
+        case "descricao":
+          cmp = a.descricao.localeCompare(b.descricao);
+          break;
+        case "valor":
+          cmp = a.valor - b.valor;
+          break;
+        case "categoria":
+          cmp = (a.categoria_nome || "").localeCompare(b.categoria_nome || "");
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [transacoes, search, tipoFilter, categoriaFilter, sortColumn, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const hasFilters = search || tipoFilter !== "todas" || categoriaFilter !== "todas";
+
+  function clearFilters() {
+    setSearch("");
+    setTipoFilter("todas");
+    setCategoriaFilter("todas");
+  }
 
   if (transacoes.length === 0) {
     return (
@@ -130,20 +214,97 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
   return (
     <>
       <Card>
-        <h3 className="mb-5 text-sm font-semibold text-[var(--foreground)]">
-          Transações
-          <span className="ml-2 font-normal text-[var(--muted-foreground)]">
-            ({transacoes.length})
-          </span>
-        </h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">
+            Transações
+            <span className="ml-2 font-normal text-slate-400">
+              ({filtered.length})
+            </span>
+          </h3>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex cursor-pointer items-center gap-1 text-xs text-slate-400 hover:text-[var(--foreground)] transition-colors"
+            >
+              <RotateCcw size={12} />
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:max-w-64">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Buscar por descrição..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--card)] py-2 pl-9 pr-8 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none focus:border-[var(--accent)] transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 hover:text-[var(--foreground)] transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <select
+            value={tipoFilter}
+            onChange={(e) => setTipoFilter(e.target.value as any)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
+          >
+            <option value="todas">Todos os tipos</option>
+            <option value="receita">Receitas</option>
+            <option value="despesa">Despesas</option>
+          </select>
+
+          <select
+            value={categoriaFilter}
+            onChange={(e) => setCategoriaFilter(e.target.value)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
+          >
+            <option value="todas">Todas as categorias</option>
+            {categorias.map((cat) => (
+              <option key={cat.nome} value={cat.nome}>
+                {cat.nome}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="overflow-x-auto">
-          {/* Header */}
-          <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
-            <div className="col-span-4 lg:col-span-5">Transação</div>
-            <div className="col-span-3 lg:col-span-2">Categoria</div>
-            <div className="col-span-2 hidden lg:block">Data</div>
-            <div className="col-span-3 lg:col-span-2 text-right">Valor</div>
+          <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium uppercase tracking-wider text-slate-400">
+            <button
+              onClick={() => toggleSort("descricao")}
+              className="col-span-4 lg:col-span-5 flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-[var(--foreground)]"
+            >
+              Transação <SortIcon col="descricao" />
+            </button>
+            <button
+              onClick={() => toggleSort("categoria")}
+              className="col-span-3 lg:col-span-2 flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-[var(--foreground)]"
+            >
+              Categoria <SortIcon col="categoria" />
+            </button>
+            <button
+              onClick={() => toggleSort("data")}
+              className="col-span-2 hidden lg:flex items-center gap-1 cursor-pointer transition-colors hover:text-[var(--foreground)]"
+            >
+              Data <SortIcon col="data" />
+            </button>
+            <button
+              onClick={() => toggleSort("valor")}
+              className="col-span-3 lg:col-span-2 flex cursor-pointer items-center justify-end gap-1 transition-colors hover:text-[var(--foreground)]"
+            >
+              Valor <SortIcon col="valor" />
+            </button>
             <div className="col-span-2 lg:col-span-1" />
           </div>
 
@@ -155,7 +316,6 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                   t.status === "pendente" ? "opacity-70" : ""
                 } ${idx < paginated.length - 1 ? "border-b border-[var(--border)]" : ""}`}
               >
-                {/* Col 1: Icon + Description */}
                 <div className="col-span-4 lg:col-span-5 flex items-center gap-3 min-w-0">
                   <div
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
@@ -180,7 +340,6 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                   </div>
                 </div>
 
-                {/* Col 2: Category badge */}
                 <div className="col-span-3 lg:col-span-2">
                   <span
                     className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium"
@@ -194,12 +353,10 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                   </span>
                 </div>
 
-                {/* Col 3: Date (hidden on mobile) */}
-                <div className="col-span-2 hidden lg:block text-[var(--muted-foreground)]">
+                <div className="col-span-2 hidden lg:block text-slate-400">
                   {formatDate(t.data)}
                 </div>
 
-                {/* Col 4: Value + actions */}
                 <div className="col-span-3 lg:col-span-2 flex items-center justify-end gap-1">
                   <span
                     className={`shrink-0 font-semibold tabular-nums ${
@@ -231,13 +388,13 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                         tipo: t.tipo,
                       } as Transacao)
                     }
-                    className="cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+                    className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-[var(--muted)] transition-colors"
                   >
                     <Pencil size={16} />
                   </button>
                   <button
                     onClick={() => { setDeleteItem(t); setDeleteJustificativa(""); }}
-                    className="cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                    className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -247,17 +404,16 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
           </div>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
-            <p className="text-xs text-[var(--muted-foreground)]">
+            <p className="text-xs text-slate-400">
               Página {page} de {totalPages}
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft size={14} />
                 Anterior
@@ -265,7 +421,7 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Próximo
                 <ChevronRight size={14} />

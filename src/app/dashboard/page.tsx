@@ -326,13 +326,13 @@ export default function DashboardPage() {
   return (
     <>
       <Header />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <MonthSelector months={availableMonths} value={month} onChange={setMonth} />
             <button
               onClick={() => setCustomizeOpen(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-slate-400 hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
               title="Personalizar dashboard"
             >
               <Settings2 size={14} />
@@ -340,7 +340,7 @@ export default function DashboardPage() {
             </button>
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--foreground)]">
-            <span className="hidden text-xs text-[var(--muted-foreground)] sm:inline">Mostrar previstos</span>
+            <span className="hidden text-xs text-slate-400 sm:inline">Mostrar previstos</span>
             <button
               role="switch"
               aria-checked={mostrarPrevistas}

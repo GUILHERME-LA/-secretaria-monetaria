@@ -27,9 +27,11 @@ type CategoryGroup = {
 type Props = {
   transactions: Transaction[];
   tipo?: "receita" | "despesa";
+  categoriaFiltro?: string | null;
+  onCategoriaClick?: (nome: string) => void;
 };
 
-export function CategoryBreakdown({ transactions, tipo = "despesa" }: Props) {
+export function CategoryBreakdown({ transactions, tipo = "despesa", categoriaFiltro, onCategoriaClick }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const filtered = transactions.filter(
@@ -73,11 +75,21 @@ export function CategoryBreakdown({ transactions, tipo = "despesa" }: Props) {
         {groups.map((g) => {
           const isOpen = expanded === g.nome;
           const pct = total > 0 ? (g.valor / total) * 100 : 0;
+          const isActive = categoriaFiltro === g.nome;
+          const isClickable = !!onCategoriaClick;
 
           return (
-            <div key={g.nome}>
+            <div
+              key={g.nome}
+              className={`${isClickable ? "cursor-pointer" : ""} ${
+                isActive ? "" : categoriaFiltro ? "opacity-40" : ""
+              } hover:opacity-100 transition-opacity`}
+            >
               <button
-                onClick={() => setExpanded(isOpen ? null : g.nome)}
+                onClick={() => {
+                  if (isClickable) onCategoriaClick(g.nome);
+                  setExpanded(isOpen ? null : g.nome);
+                }}
                 className="flex w-full cursor-pointer items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-left transition-colors hover:bg-[var(--muted)]/50"
               >
                 <span

@@ -28,8 +28,8 @@ export function ExpensePieChart({ data }: Props) {
       <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
         Gastos por Categoria
       </h3>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="relative w-full shrink-0 lg:w-48">
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+        <div className="relative w-full shrink-0 sm:w-48">
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -74,19 +74,31 @@ export function ExpensePieChart({ data }: Props) {
             <p className="text-[11px] text-[var(--muted-foreground)]">Total gasto</p>
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          {data.map((item) => (
-            <div key={item.nome} className="flex items-center gap-2 text-xs">
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: item.cor }}
-              />
-              <span className="text-[var(--muted-foreground)]">{item.nome}</span>
-              <span className="font-medium text-[var(--foreground)]">
-                {((item.valor / total) * 100).toFixed(1)}%
-              </span>
-            </div>
-          ))}
+
+        <div className="flex w-full flex-col gap-2.5 sm:flex-1 sm:min-w-0">
+          {data.map((item) => {
+            const pct = (item.valor / total) * 100;
+            return (
+              <div key={item.nome} className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: item.cor }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[var(--muted-foreground)]">
+                  {item.nome}
+                </span>
+                <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--muted)] sm:w-20">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%`, backgroundColor: item.cor }}
+                  />
+                </div>
+                <span className="w-12 shrink-0 text-right font-medium text-[var(--foreground)] tabular-nums">
+                  {pct.toFixed(1)}%
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </Card>

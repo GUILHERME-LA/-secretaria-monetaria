@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Mail, Lock, Save, Loader2, User as UserIcon, Shield, Info } from "lucide-react";
+import { Mail, Lock, Save, Loader2, User as UserIcon, Shield, Info, Sun, Moon } from "lucide-react";
 import { createClient } from "@/lib/supabase-client";
 import type { User } from "@supabase/supabase-js";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -22,6 +23,8 @@ export default function SettingsPage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
+
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -269,6 +272,49 @@ export default function SettingsPage() {
                 {passwordLoading ? "Salvando..." : "Alterar senha"}
               </Button>
             </form>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13, duration: 0.2 }}
+          className="mb-6"
+        >
+          <Card>
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              Aparência
+            </h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--foreground)]">
+                  {theme === "dark" ? "Modo escuro" : "Modo claro"}
+                </p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {theme === "dark"
+                    ? "Interface em tons escuros para reduzir cansaço visual"
+                    : "Interface clara para melhor visibilidade em ambientes iluminados"}
+                </p>
+              </div>
+              <button
+                onClick={toggleTheme}
+                className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-[var(--background)]"
+                style={{
+                  backgroundColor: theme === "dark" ? "var(--accent)" : "var(--muted)",
+                }}
+                role="switch"
+                aria-checked={theme === "dark"}
+              >
+                <span
+                  className={`pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-white shadow ring-0 transition-transform ${
+                    theme === "dark" ? "translate-x-5" : "translate-x-0"
+                  }`}
+                >
+                  {theme === "dark" ? <Moon size={10} /> : <Sun size={10} />}
+                </span>
+              </button>
+            </div>
           </Card>
         </motion.div>
 
