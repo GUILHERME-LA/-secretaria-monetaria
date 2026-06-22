@@ -370,13 +370,13 @@ export default function DashboardPage() {
           sparklineDespesas={sparklineDespesas}
         />
 
-        <div className="mt-6 flex flex-wrap gap-6">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
           {prefs.insights && (
-            <div className="min-w-[280px] flex-1">
+            <div className="lg:col-span-2">
               <FinancialInsights insights={insights} loading={insightsLoading} />
             </div>
           )}
-          <div className="min-w-[280px] flex-1">
+          <div className="lg:col-span-1">
             <FinancialHealth
               score={0}
               receitas={receitas}
@@ -386,7 +386,7 @@ export default function DashboardPage() {
             />
           </div>
           {prefs.calendar && (
-            <div className="min-w-[280px] flex-1">
+            <div className="lg:col-span-1">
               <FinancialCalendar eventos={eventosCalendario} />
             </div>
           )}
@@ -396,9 +396,6 @@ export default function DashboardPage() {
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="lg:col-span-4">
               <ExpensePieChart data={pieData} />
-              <div className="mt-6">
-                <ExpenseRanking data={rankingData} />
-              </div>
             </div>
             <div className="lg:col-span-8">
               <MonthlyBarChart
@@ -406,15 +403,17 @@ export default function DashboardPage() {
                 previstoData={mostrarPrevistas ? comparativoTotal : undefined}
               />
             </div>
-          </div>
-        )}
-
-        {prefs.metas && (
-          <div className="mt-8">
-            <MetasDashboard
-              metas={metas}
-              onOpenPage={() => window.location.href = "/metas"}
-            />
+            <div className="lg:col-span-4">
+              <ExpenseRanking data={rankingData} />
+            </div>
+            {prefs.metas && (
+              <div className="lg:col-span-8">
+                <MetasDashboard
+                  metas={metas}
+                  onOpenPage={() => window.location.href = "/metas"}
+                />
+              </div>
+            )}
           </div>
         )}
 

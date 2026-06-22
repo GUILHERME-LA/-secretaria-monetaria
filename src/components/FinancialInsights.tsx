@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, Loader2 } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { Insight } from "@/lib/insights-engine";
 
@@ -29,13 +30,24 @@ function Skeleton() {
 }
 
 export function FinancialInsights({ insights, loading }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpand(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div>
         <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
           Insights
         </h3>
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Skeleton />
           <Skeleton />
           <Skeleton />
@@ -59,9 +71,10 @@ export function FinancialInsights({ insights, loading }: Props) {
       <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
         Insights
       </h3>
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {insights.map((item, idx) => {
           const style = typeStyles[item.type] || typeStyles.info;
+          const isExpanded = expanded.has(item.id);
           return (
             <motion.div
               key={item.id}
@@ -71,13 +84,25 @@ export function FinancialInsights({ insights, loading }: Props) {
               className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${style.bg} ${style.border}`}
             >
               <span className="mt-0.5 block text-lg leading-none">{item.icon}</span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold text-[var(--foreground)]">
                   {item.title}
                 </p>
-                <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                <p
+                  className={`mt-0.5 text-xs text-[var(--muted-foreground)] ${
+                    !isExpanded ? "line-clamp-2" : ""
+                  }`}
+                >
                   {item.description}
                 </p>
+                {item.description.length > 80 && (
+                  <button
+                    onClick={() => toggleExpand(item.id)}
+                    className="mt-0.5 text-[10px] text-[var(--accent)] hover:underline cursor-pointer"
+                  >
+                    {isExpanded ? "Ver menos" : "Ver mais..."}
+                  </button>
+                )}
               </div>
             </motion.div>
           );
