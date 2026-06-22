@@ -61,15 +61,25 @@ export default function SettingsPage() {
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    try {
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "solicitar_alteracao_email", payload: { new_email: newEmail } }),
+      });
+      const data = await res.json();
 
-    if (error) {
-      setEmailError(error.message);
-    } else {
-      setEmailSuccess(
-        "Enviamos um link de confirmação para o novo email. Verifique sua caixa de entrada."
-      );
+      if (data.success) {
+        setEmailSuccess(
+          "Enviamos um link de confirmação para seu email atual. Verifique sua caixa de entrada."
+        );
+      } else {
+        setEmailError(data.error || "Erro ao solicitar alteração de email.");
+      }
+    } catch {
+      setEmailError("Erro de conexão. Tente novamente.");
     }
+
     setEmailLoading(false);
   }
 

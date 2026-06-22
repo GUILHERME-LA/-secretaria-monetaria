@@ -37,7 +37,10 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === "/confirm" ||
     request.nextUrl.pathname === "/forgot-password";
 
-  if (request.nextUrl.pathname === "/update-password") {
+  if (
+    request.nextUrl.pathname === "/update-password" ||
+    request.nextUrl.pathname === "/confirm-email-change"
+  ) {
     return supabaseResponse;
   }
 

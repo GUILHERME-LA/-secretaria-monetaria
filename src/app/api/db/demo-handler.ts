@@ -242,6 +242,23 @@ export async function handleDemoAction(action: string, payload: any) {
       state.auditoria.push(a);
       return NextResponse.json({ success: true, data: { id: a.id } });
     }
+    case "solicitar_alteracao_email": {
+      console.log("[DEMO] Solicitação de alteração de email:", payload.new_email);
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "validar_token_email": {
+      return NextResponse.json({
+        success: true,
+        data: {
+          user_id: "demo-user",
+          current_email: "demo@demo.com",
+          new_email: payload.new_email || "novo@demo.com",
+        },
+      });
+    }
+    case "confirmar_alteracao_email": {
+      return NextResponse.json({ success: true, data: null });
+    }
     default:
       return NextResponse.json({ success: true, data: null });
   }
