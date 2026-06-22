@@ -352,11 +352,11 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
                     {t.status === "pendente" && <span className="ml-1.5 rounded bg-yellow-500/10 px-1.5 py-0.5 text-[10px] text-yellow-500 font-medium">Previsto</span>}
                   </div>
                   <div className="sm:col-span-2 text-xs text-slate-400">{formatDate(t.data)}</div>
-                  <div className="flex items-center justify-end gap-2 sm:col-span-2">
-                    <span className={`shrink-0 font-semibold tabular-nums ${t.tipo === "receita" ? "text-emerald-500" : "text-red-500"}`}>
+                  <div className="flex items-center justify-end sm:col-span-2">
+                    <span className={`shrink-0 font-semibold tabular-nums mr-3 ${t.tipo === "receita" ? "text-emerald-500" : "text-red-500"}`}>
                       {t.tipo === "receita" ? "+" : "-"}{formatCurrency(t.valor)}
                     </span>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex w-20 shrink-0 items-center justify-end gap-1">
                       {t.status === "pendente" && <button onClick={() => confirmar(t.id)} className="cursor-pointer rounded-lg p-2 text-emerald-500 hover:bg-emerald-500/10 transition-colors" title="Confirmar"><Check size={16} /></button>}
                       <button onClick={() => setEditItem({ ...t, categoria_id: t.categoria_id, descricao: t.descricao, valor: t.valor, data: t.data, tipo: t.tipo } as Transacao)} className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-[var(--muted)] transition-colors"><Pencil size={16} /></button>
                       <button onClick={() => { setDeleteItem(t); setDeleteJustificativa(""); }} className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
