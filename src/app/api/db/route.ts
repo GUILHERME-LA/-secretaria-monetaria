@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/supabase-mock";
+import { handleDemoAction } from "./demo-handler";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { Pool } from "pg";
 
@@ -8,15 +10,19 @@ const pool = new Pool({
 });
 
 export async function POST(request: NextRequest) {
+  const { action, payload } = await request.json();
+  if (!action || !payload) {
+    return NextResponse.json({ error: "action e payload são obrigatórios" }, { status: 400 });
+  }
+
+  if (isDemoMode()) {
+    return handleDemoAction(action, payload);
+  }
+
   const supabase = await createServerSupabase();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-
-  const { action, payload } = await request.json();
-  if (!action || !payload) {
-    return NextResponse.json({ error: "action e payload são obrigatórios" }, { status: 400 });
   }
 
   try {

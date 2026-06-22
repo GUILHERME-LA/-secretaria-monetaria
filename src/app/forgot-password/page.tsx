@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Send, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, Loader2, MailCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase-client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -38,15 +38,19 @@ export default function ForgotPasswordPage() {
       <div className="flex min-h-screen items-center justify-center px-4">
         <Card className="w-full max-w-sm text-center">
           <div className="mb-6 flex justify-center">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
+            <div className="rounded-full bg-green-500/10 p-3">
+              <MailCheck className="h-10 w-10 text-green-500" />
+            </div>
           </div>
           <h1 className="mb-2 text-xl font-bold text-[var(--foreground)]">
             Email enviado!
           </h1>
-          <p className="mb-6 text-sm text-[var(--muted-foreground)]">
+          <p className="mb-2 text-sm text-[var(--muted-foreground)]">
             Enviamos um link de recuperação para{" "}
             <strong className="text-[var(--foreground)]">{email}</strong>.
-            Verifique sua caixa de entrada e spam.
+          </p>
+          <p className="mb-6 text-xs text-[var(--muted-foreground)]">
+            O link expira em 1 hora. Se não encontrar, verifique a caixa de spam.
           </p>
           <Link
             href="/login"
@@ -67,7 +71,7 @@ export default function ForgotPasswordPage() {
           Recuperar senha
         </h1>
         <p className="mb-6 text-sm text-[var(--muted-foreground)]">
-          Digite seu email e enviaremos um link para redefinir sua senha.
+          Digite seu email cadastrado e enviaremos um link para redefinir sua senha.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -76,15 +80,27 @@ export default function ForgotPasswordPage() {
             type="email"
             placeholder="seu@email.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError("");
+            }}
             required
           />
           {error && (
             <p className="text-sm text-[var(--destructive)]">{error}</p>
           )}
-          <Button type="submit" disabled={loading}>
-            <Send className="h-4 w-4" />
-            {loading ? "Enviando..." : "Enviar link de recuperação"}
+          <Button type="submit" disabled={loading || !email.includes("@")}>
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Send className="h-4 w-4" />
+                Enviar link de recuperação
+              </span>
+            )}
           </Button>
         </form>
 
