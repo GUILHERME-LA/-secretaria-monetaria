@@ -57,6 +57,12 @@ export interface Auditoria {
   created_at: string;
 }
 
+export interface Tag {
+  id: string;
+  nome: string;
+  cor: string;
+}
+
 export interface DashboardData {
   totalReceitas: number;
   totalDespesas: number;

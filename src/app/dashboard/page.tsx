@@ -28,9 +28,13 @@ import { FinancialHealth } from "@/components/FinancialHealth";
 import { FinancialCalendar } from "@/components/FinancialCalendar";
 import { MetasDashboard, type Meta } from "@/components/MetasDashboard";
 import { WelcomeTutorial } from "@/components/WelcomeTutorial";
+import { WhatsNewModal } from "@/components/WhatsNewModal";
+import { shouldShowWhatsNew } from "@/lib/whats-new";
 import { Modal } from "@/components/ui/Modal";
 import { seedDefaultCategories } from "@/lib/seed-categories";
 import { Settings2 } from "lucide-react";
+import { generateNotifications, getNotifications } from "@/lib/notifications";
+import { useToast } from "@/components/ui/Toast";
 
 const widgetLabels: Record<WidgetKey, string> = {
   insights: "Insights Inteligentes",
@@ -40,12 +44,14 @@ const widgetLabels: Record<WidgetKey, string> = {
 };
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const hoje = getCurrentMonth();
   const [month, setMonth] = useState(hoje);
   const [refreshKey, setRefreshKey] = useState(0);
   const [availableMonths, setAvailableMonths] = useState<string[]>([hoje]);
   const [mostrarPrevistas, setMostrarPrevistas] = useState(true);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const { prefs, toggle } = useDashboardPrefs(userId);
 
@@ -73,6 +79,7 @@ export default function DashboardPage() {
   >([]);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsGenerated, setInsightsGenerated] = useState(false);
 
   useEffect(() => {
     createClient()
@@ -269,6 +276,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     seedDefaultCategories();
+    if (shouldShowWhatsNew()) setWhatsNewOpen(true);
   }, []);
 
   useEffect(() => {
@@ -287,7 +295,7 @@ export default function DashboardPage() {
     loadMetas();
   }, [loadDashboard, loadComparativo, loadCalendar, loadMetas, refreshKey]);
 
-  useEffect(() => {
+  function handleGenerateInsights() {
     if (!receitas && !despesas) return;
     setInsightsLoading(true);
     fetch("/api/insights", {
@@ -306,10 +314,39 @@ export default function DashboardPage() {
       .then((res) => {
         if (res.success) setInsights(res.data);
         else setInsights([]);
+        setInsightsGenerated(true);
       })
-      .catch(() => setInsights([]))
+      .catch(() => { setInsights([]); setInsightsGenerated(true); })
       .finally(() => setInsightsLoading(false));
-  }, [receitas, despesas, variacaoReceitas, variacaoDespesas, pieData, comparativo]);
+  }
+
+  function isEndOfMonth(): boolean {
+    const agora = new Date();
+    const ultimoDia = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
+    return agora.getDate() >= ultimoDia - 6;
+  }
+
+  useEffect(() => {
+    const prev = getNotifications();
+    if (!isEndOfMonth()) return;
+    generateNotifications(fetchApi).then((ns) => {
+      const newCritical = ns.some(
+        (n) => n.type === "critical" && !n.dismissed && !prev.find((p) => p.id === n.id)
+      );
+      if (newCritical) {
+        toast({ message: "Alerta financeiro crítico — veja a Central de Notificações", type: "info" });
+      }
+    });
+  }, [refreshKey]);
+
+  async function fetchApi(url: string, body: unknown) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  }
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1);
@@ -373,7 +410,7 @@ export default function DashboardPage() {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
           {prefs.insights && (
             <div className="lg:col-span-2">
-              <FinancialInsights insights={insights} loading={insightsLoading} />
+              <FinancialInsights insights={insights} loading={insightsLoading} generated={insightsGenerated} onGenerate={handleGenerateInsights} />
             </div>
           )}
           <div className="lg:col-span-1">
@@ -423,6 +460,7 @@ export default function DashboardPage() {
       </main>
 
       <WelcomeTutorial />
+      <WhatsNewModal open={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} />
 
       <Modal open={customizeOpen} onClose={() => setCustomizeOpen(false)} title="Personalizar Dashboard">
         <div className="flex flex-col gap-3">

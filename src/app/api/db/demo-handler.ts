@@ -10,12 +10,24 @@ const state: {
   recorrentes: any[];
   metas: any[];
   auditoria: any[];
+  tags: any[];
+  transacaoTags: Map<string, string[]>;
+  splits: any[];
 } = {
   categorias: [...demoCategories],
   transacoes: generateDemoTransacoes(),
   recorrentes: generateDemoRecorrentes(),
   metas: generateDemoMetas(),
   auditoria: [],
+  tags: [
+    { id: "tag-1", user_id: "demo-user", nome: "Trabalho", cor: "#6366f1" },
+    { id: "tag-2", user_id: "demo-user", nome: "Pessoal", cor: "#ec4899" },
+    { id: "tag-3", user_id: "demo-user", nome: "Assinatura", cor: "#f97316" },
+    { id: "tag-4", user_id: "demo-user", nome: "Alimentação", cor: "#14b8a6" },
+    { id: "tag-5", user_id: "demo-user", nome: "Transporte", cor: "#8b5cf6" },
+  ],
+  transacaoTags: new Map(),
+  splits: [],
 };
 
 function generateDemoTransacoes() {
@@ -257,6 +269,89 @@ export async function handleDemoAction(action: string, payload: any) {
       });
     }
     case "confirmar_alteracao_email": {
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "criar_tag": {
+      const existing = state.tags.find((t: any) => t.nome === payload.nome && t.user_id === "demo-user");
+      if (existing) {
+        existing.cor = payload.cor || existing.cor;
+        return NextResponse.json({ success: true, data: { id: existing.id } });
+      }
+      const tag = { id: uid(), user_id: "demo-user", nome: payload.nome, cor: payload.cor || "#6366f1" };
+      state.tags.push(tag);
+      return NextResponse.json({ success: true, data: { id: tag.id } });
+    }
+    case "listar_tags": {
+      return NextResponse.json({ success: true, data: state.tags.filter((t: any) => t.user_id === "demo-user") });
+    }
+    case "excluir_tag": {
+      state.tags = state.tags.filter((t: any) => t.id !== payload.id);
+      state.transacaoTags.forEach((v, k) => {
+        state.transacaoTags.set(k, v.filter((id: string) => id !== payload.id));
+      });
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "vincular_tags_transacao": {
+      state.transacaoTags.set(payload.transacao_id, payload.tag_ids || []);
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "listar_tags_transacao": {
+      const ids = state.transacaoTags.get(payload.transacao_id) || [];
+      const found = state.tags.filter((t: any) => ids.includes(t.id));
+      return NextResponse.json({ success: true, data: found });
+    }
+    case "listar_tags_periodo": {
+      const result: any[] = [];
+      state.transacoes
+        .filter((t: any) => t.data >= payload.inicio && t.data <= payload.fim)
+        .forEach((t: any) => {
+          const ids = state.transacaoTags.get(t.id) || [];
+          ids.forEach((tagId: string) => {
+            const tag = state.tags.find((tg: any) => tg.id === tagId);
+            if (tag) result.push({ transacao_id: t.id, id: tag.id, nome: tag.nome, cor: tag.cor });
+          });
+        });
+      return NextResponse.json({ success: true, data: result });
+    }
+    case "excluir_transacoes": {
+      const ids: string[] = payload.ids || [];
+      state.transacoes = state.transacoes.filter((t: any) => !ids.includes(t.id));
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "confirmar_transacoes": {
+      const confirmIds: string[] = payload.ids || [];
+      state.transacoes.forEach((t: any) => {
+        if (confirmIds.includes(t.id)) t.status = "confirmada";
+      });
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "criar_split": {
+      const parts: { categoria_id: string; valor: number; descricao: string }[] = payload.parts || [];
+      for (const part of parts) {
+        const cat = state.categorias.find((c: any) => c.id === part.categoria_id);
+        state.splits.push({
+          id: uid(),
+          transacao_id: payload.transacao_id,
+          categoria_id: part.categoria_id,
+          descricao: part.descricao,
+          valor: part.valor,
+          categoria_nome: cat?.nome || "Sem categoria",
+          categoria_cor: cat?.cor || "#6366f1",
+        });
+      }
+      return NextResponse.json({ success: true, data: null });
+    }
+    case "listar_splits": {
+      const found = state.splits
+        .filter((s: any) => s.transacao_id === payload.transacao_id)
+        .map((s: any) => {
+          const cat = state.categorias.find((c: any) => c.id === s.categoria_id);
+          return { ...s, categoria_nome: cat?.nome || "Sem categoria", categoria_cor: cat?.cor || "#6366f1" };
+        });
+      return NextResponse.json({ success: true, data: found });
+    }
+    case "excluir_split": {
+      state.splits = state.splits.filter((s: any) => s.transacao_id !== payload.transacao_id);
       return NextResponse.json({ success: true, data: null });
     }
     default:

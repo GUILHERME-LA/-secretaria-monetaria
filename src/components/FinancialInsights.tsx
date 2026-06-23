@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, Sparkles } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import type { Insight } from "@/lib/insights-engine";
 
 type Props = {
   insights: Insight[];
   loading?: boolean;
+  generated: boolean;
+  onGenerate: () => void;
 };
 
 const typeStyles: Record<string, { bg: string; border: string }> = {
@@ -29,7 +32,27 @@ function Skeleton() {
   );
 }
 
-export function FinancialInsights({ insights, loading }: Props) {
+function IdleState({ onGenerate }: { onGenerate: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)]/20 px-6 py-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--accent)]/10">
+        <Sparkles size={24} className="text-[var(--accent)]" />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">Análises Financeiras</h3>
+        <p className="mt-1 text-xs text-[var(--muted-foreground)] leading-relaxed max-w-xs">
+          Quer descobrir padrões, tendências e oportunidades nos seus gastos? Gere uma análise completa com IA.
+        </p>
+      </div>
+      <Button size="sm" onClick={onGenerate}>
+        <Sparkles size={14} />
+        Gerar Análise
+      </Button>
+    </div>
+  );
+}
+
+export function FinancialInsights({ insights, loading, generated, onGenerate }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   function toggleExpand(id: string) {
@@ -56,21 +79,32 @@ export function FinancialInsights({ insights, loading }: Props) {
     );
   }
 
+  if (!generated) {
+    return <IdleState onGenerate={onGenerate} />;
+  }
+
   if (insights.length === 0) {
     return (
       <EmptyState
         icon={Lightbulb}
         title="Nenhum insight disponível"
-        description="Adicione transações para receber análises inteligentes."
+        description="Adicione mais transações para gerar análises inteligentes."
+        action={{ label: "Tentar novamente", onClick: onGenerate }}
       />
     );
   }
 
   return (
     <div>
-      <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
-        Insights
-      </h3>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">
+          Insights
+        </h3>
+        <Button variant="ghost" size="sm" onClick={onGenerate}>
+          <Sparkles size={12} />
+          Atualizar
+        </Button>
+      </div>
       <div className="flex flex-col gap-3">
         {insights.map((item, idx) => {
           const style = typeStyles[item.type] || typeStyles.info;
@@ -84,7 +118,7 @@ export function FinancialInsights({ insights, loading }: Props) {
               className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${style.bg} ${style.border}`}
             >
               <span className="mt-0.5 block text-lg leading-none">{item.icon}</span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-[var(--foreground)]">
                   {item.title}
                 </p>

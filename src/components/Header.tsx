@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Repeat, History, HelpCircle, Menu, Target, BarChart3, Upload } from "lucide-react";
+import { Repeat, History, HelpCircle, Menu, Target, BarChart3, Upload, BellDot } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
 import { SideDrawer } from "./SideDrawer";
+import { getUnreadCount } from "@/lib/notifications";
 
 const navLinks = [
   { href: "/recorrentes", label: "Recorrentes", icon: Repeat },
@@ -20,6 +21,22 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    setUnreadCount(getUnreadCount());
+    const handle = () => setUnreadCount(getUnreadCount());
+    window.addEventListener("storage", handle);
+    window.addEventListener("focus", handle);
+    window.addEventListener("notifications-read", handle);
+    const interval = setInterval(handle, 10000);
+    return () => {
+      window.removeEventListener("storage", handle);
+      window.removeEventListener("focus", handle);
+      window.removeEventListener("notifications-read", handle);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <>
@@ -73,6 +90,18 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              onClick={() => router.push("/notificacoes")}
+              className="relative flex cursor-pointer rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+              aria-label="Notificações"
+            >
+              <BellDot size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
             <ThemeToggle />
             <UserMenu />
           </div>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { TransitionProvider } from "@/components/TransitionProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 import { ServiceWorkerRegistration } from "./components/sw-registration";
 
 export const metadata: Metadata = {
@@ -48,7 +49,11 @@ export default function RootLayout({
       <body>
         <ServiceWorkerRegistration />
         <ThemeProvider>
-          <TransitionProvider>{children}</TransitionProvider>
+          <TransitionProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </TransitionProvider>
         </ThemeProvider>
       </body>
     </html>

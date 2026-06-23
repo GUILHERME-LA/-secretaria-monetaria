@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import type { TransacaoFormData } from "@/lib/types";
+import { useState, useEffect, useRef } from "react";
+import type { TransacaoFormData, Tag } from "@/lib/types";
 import { Input } from "./ui/Input";
 import { Textarea } from "./ui/Textarea";
 import { Button } from "./ui/Button";
 import { CategorySelect } from "./CategorySelect";
+import { TagInput } from "./ui/TagInput";
+import { useToast } from "./ui/Toast";
 
 type Props = {
   onDone: () => void;
@@ -14,6 +16,7 @@ type Props = {
 };
 
 export function TransactionForm({ onDone, initial, currentMonth }: Props) {
+  const { toast } = useToast();
   const [tipo, setTipo] = useState<"receita" | "despesa">(
     initial?.tipo || "despesa"
   );
@@ -23,9 +26,25 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
   const [data, setData] = useState(
     initial?.data || new Date().toISOString().slice(0, 10)
   );
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [justificativa, setJustificativa] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const oldDataRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (initial?.id) {
+      fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listar_tags_transacao", payload: { transacao_id: initial.id } }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.data) setTagIds(res.data.map((t: Tag) => t.id));
+        });
+    }
+  }, [initial?.id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,8 +65,9 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
         body: JSON.stringify({ action: "obter_transacao", payload: { id: initial.id } }),
       });
       const { data: atual } = await resAtual.json();
+      oldDataRef.current = atual;
 
-      await fetch("/api/db", {
+      const updRes = await fetch("/api/db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -55,8 +75,15 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
           payload: { id: initial.id, tipo, categoria_id: categoriaId, descricao, valor: novoValor, data: novaData },
         }),
       });
+      const updJson = await updRes.json();
+      if (updJson.error) {
+        setErro(updJson.error);
+        toast({ message: updJson.error, type: "error" });
+        setLoading(false);
+        return;
+      }
 
-      const res = await fetch("/api/db", {
+      await fetch("/api/db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -66,56 +93,79 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
             acao: "alteracao",
             justificativa: justificativa.trim(),
             dados_anteriores: atual ? JSON.stringify({
-              tipo: atual.tipo,
-              categoria_id: atual.categoria_id,
-              descricao: atual.descricao,
-              valor: Number(atual.valor),
-              data: atual.data,
-              status: atual.status,
+              tipo: atual.tipo, categoria_id: atual.categoria_id,
+              descricao: atual.descricao, valor: Number(atual.valor),
+              data: atual.data, status: atual.status,
             }) : null,
-            dados_novos: JSON.stringify({
-              tipo,
-              categoria_id: categoriaId,
-              descricao,
-              valor: novoValor,
-              data: novaData,
-              status,
-            }),
+            dados_novos: JSON.stringify({ tipo, categoria_id: categoriaId, descricao, valor: novoValor, data: novaData, status }),
           },
         }),
       });
-      const audData = await res.json();
-      if (audData.error) {
-        setErro(audData.error);
-        setLoading(false);
-        return;
-      }
+
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "vincular_tags_transacao", payload: { transacao_id: initial.id, tag_ids: tagIds } }),
+      });
+
+      setLoading(false);
+      onDone();
+      toast({
+        message: "Transação atualizada com sucesso",
+        type: "success",
+        undo: () => {
+          const old = oldDataRef.current;
+          if (!old) return;
+          fetch("/api/db", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "atualizar_transacao",
+              payload: { id: initial.id, tipo: old.tipo, categoria_id: old.categoria_id, descricao: old.descricao, valor: Number(old.valor), data: old.data },
+            }),
+          });
+        },
+        undoLabel: "Reverter",
+      });
     } else {
       const res = await fetch("/api/db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "inserir_transacao",
-          payload: {
-            tipo,
-            categoria_id: categoriaId,
-            descricao,
-            valor: novoValor,
-            data: novaData,
-            status,
-          },
+          payload: { tipo, categoria_id: categoriaId, descricao, valor: novoValor, data: novaData, status },
         }),
       });
       const insertData = await res.json();
       if (insertData.error) {
         setErro(insertData.error);
+        toast({ message: insertData.error, type: "error" });
         setLoading(false);
         return;
       }
-    }
 
-    setLoading(false);
-    onDone();
+      const newId = insertData.data.id;
+
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "vincular_tags_transacao", payload: { transacao_id: newId, tag_ids: tagIds } }),
+      });
+
+      setLoading(false);
+      onDone();
+      toast({
+        message: "Transação adicionada com sucesso",
+        type: "success",
+        undo: () => {
+          fetch("/api/db", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "excluir_transacao", payload: { id: newId } }),
+          });
+        },
+      });
+    }
   }
 
   const editando = !!initial?.id;
@@ -174,6 +224,8 @@ export function TransactionForm({ onDone, initial, currentMonth }: Props) {
         onChange={(e) => setData(e.target.value)}
         required
       />
+
+      <TagInput value={tagIds} onChange={setTagIds} />
 
       {editando && (
         <Textarea

@@ -220,6 +220,119 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, data: null });
       }
 
+      case "criar_tag": {
+        result = await pool.query(
+          "INSERT INTO sm_tags (user_id, nome, cor) VALUES ($1, $2, $3) ON CONFLICT (user_id, nome) DO UPDATE SET cor = EXCLUDED.cor RETURNING id",
+          [user.id, payload.nome, payload.cor || "#6366f1"]
+        );
+        return NextResponse.json({ success: true, data: { id: result.rows[0]?.id } });
+      }
+
+      case "listar_tags": {
+        result = await pool.query(
+          "SELECT id, nome, cor FROM sm_tags WHERE user_id = $1 ORDER BY nome",
+          [user.id]
+        );
+        return NextResponse.json({ success: true, data: result.rows });
+      }
+
+      case "excluir_tag": {
+        await pool.query("DELETE FROM sm_tags WHERE id = $1 AND user_id = $2", [payload.id, user.id]);
+        return NextResponse.json({ success: true, data: null });
+      }
+
+      case "vincular_tags_transacao": {
+        const tagIds: string[] = payload.tag_ids || [];
+        await pool.query("DELETE FROM sm_transacao_tags WHERE transacao_id = $1", [payload.transacao_id]);
+        for (const tagId of tagIds) {
+          await pool.query(
+            "INSERT INTO sm_transacao_tags (transacao_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [payload.transacao_id, tagId]
+          );
+        }
+        return NextResponse.json({ success: true, data: null });
+      }
+
+      case "listar_tags_transacao": {
+        result = await pool.query(
+          `SELECT t.id, t.nome, t.cor FROM sm_tags t
+           JOIN sm_transacao_tags tt ON tt.tag_id = t.id
+           WHERE tt.transacao_id = $1
+           ORDER BY t.nome`,
+          [payload.transacao_id]
+        );
+        return NextResponse.json({ success: true, data: result.rows });
+      }
+
+      case "listar_tags_periodo": {
+        result = await pool.query(
+          `SELECT tt.transacao_id, t.id, t.nome, t.cor FROM sm_tags t
+           JOIN sm_transacao_tags tt ON tt.tag_id = t.id
+           JOIN sm_transacoes tr ON tr.id = tt.transacao_id
+           WHERE tr.data >= $1 AND tr.data <= $2
+           ORDER BY t.nome`,
+          [payload.inicio, payload.fim]
+        );
+        return NextResponse.json({ success: true, data: result.rows });
+      }
+
+      case "excluir_transacoes": {
+        const ids: string[] = payload.ids || [];
+        for (const id of ids) {
+          await pool.query("SELECT excluir_transacao($1, $2)", [user.id, id]);
+        }
+        return NextResponse.json({ success: true, data: null });
+      }
+
+      case "confirmar_transacoes": {
+        const confirmIds: string[] = payload.ids || [];
+        for (const id of confirmIds) {
+          await pool.query("SELECT confirmar_transacao($1, $2)", [user.id, id]);
+        }
+        return NextResponse.json({ success: true, data: null });
+      }
+
+      case "criar_split": {
+        const splitRows: { categoria_id: string; valor: number; descricao: string }[] = payload.parts || [];
+        const totalSplit = splitRows.reduce((s, r) => s + r.valor, 0);
+
+        const transRes = await pool.query("SELECT valor, tipo FROM sm_transacoes WHERE id = $1 AND user_id = $2", [payload.transacao_id, user.id]);
+        if (transRes.rows.length === 0) {
+          return NextResponse.json({ error: "Transação não encontrada" }, { status: 404 });
+        }
+        const transValor = Number(transRes.rows[0].valor);
+        if (Math.abs(totalSplit - transValor) > 0.01) {
+          return NextResponse.json({ error: "A soma das partes deve igualar o valor total" }, { status: 400 });
+        }
+
+        for (const part of splitRows) {
+          await pool.query(
+            "INSERT INTO sm_splits (transacao_id, categoria_id, descricao, valor) VALUES ($1, $2, $3, $4)",
+            [payload.transacao_id, part.categoria_id, part.descricao, part.valor]
+          );
+        }
+
+        return NextResponse.json({ success: true, data: null });
+      }
+
+      case "listar_splits": {
+        result = await pool.query(
+          `SELECT s.id, s.transacao_id, s.categoria_id, s.descricao, s.valor,
+                  c.nome AS categoria_nome, c.cor AS categoria_cor
+           FROM sm_splits s
+           JOIN sm_categorias c ON c.id = s.categoria_id
+           WHERE s.transacao_id = $1
+           ORDER BY s.created_at`,
+          [payload.transacao_id]
+        );
+        return NextResponse.json({ success: true, data: result.rows });
+      }
+
+      case "excluir_split": {
+        await pool.query("DELETE FROM sm_splits WHERE transacao_id = $1", [payload.transacao_id]);
+        return NextResponse.json({ success: true, data: null });
+      }
+
       default:
         return NextResponse.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
