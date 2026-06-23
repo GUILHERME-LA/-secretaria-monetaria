@@ -7,6 +7,7 @@ import { Card } from "./ui/Card";
 import { EmptyState } from "./ui/EmptyState";
 import { Button } from "./ui/Button";
 import { Modal } from "./ui/Modal";
+import { CustomSelect } from "./ui/CustomSelect";
 import { TransactionForm } from "./TransactionForm";
 import { Textarea } from "./ui/Textarea";
 import {
@@ -255,28 +256,24 @@ export function TransactionList({ month, refreshKey, currentMonth, onRefresh }: 
             )}
           </div>
 
-          <select
+          <CustomSelect
             value={tipoFilter}
-            onChange={(e) => setTipoFilter(e.target.value as any)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
-          >
-            <option value="todas">Todos os tipos</option>
-            <option value="receita">Receitas</option>
-            <option value="despesa">Despesas</option>
-          </select>
+            onChange={(v) => setTipoFilter(v as any)}
+            options={[
+              { value: "todas", label: "Todos os tipos" },
+              { value: "receita", label: "Receitas" },
+              { value: "despesa", label: "Despesas" },
+            ]}
+          />
 
-          <select
+          <CustomSelect
             value={categoriaFilter}
-            onChange={(e) => setCategoriaFilter(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
-          >
-            <option value="todas">Todas as categorias</option>
-            {categorias.map((cat) => (
-              <option key={cat.nome} value={cat.nome}>
-                {cat.nome}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoriaFilter}
+            options={[
+              { value: "todas", label: "Todas as categorias" },
+              ...categorias.map((cat) => ({ value: cat.nome, label: cat.nome, color: cat.cor })),
+            ]}
+          />
         </div>
 
         <div className="overflow-x-auto">

@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { monthLabel } from "@/lib/utils";
+import { CustomSelect } from "./ui/CustomSelect";
 
 type Props = {
   months: string[];
@@ -34,17 +35,12 @@ export function MonthSelector({ months, value, onChange }: Props) {
         <ChevronLeft size={18} />
       </button>
 
-      <select
+      <CustomSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] outline-none shadow-sm transition-shadow hover:shadow-md focus:ring-2 focus:ring-[var(--ring)] max-w-[170px] sm:max-w-none truncate"
-      >
-        {months.map((m) => (
-          <option key={m} value={m}>
-            {monthLabel(m)}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={months.map((m) => ({ value: m, label: monthLabel(m) }))}
+        className="w-[170px] sm:w-auto"
+      />
 
       <button
         onClick={next}
